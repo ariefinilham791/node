@@ -26,7 +26,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar />
       <div className="md:pl-56">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 md:px-6 dark:border-gray-800 dark:bg-gray-950">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-gray-200 bg-white px-4 md:px-6 dark:border-gray-800 dark:bg-gray-950">
           <div className="flex items-center gap-2 md:hidden">
             <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
               <DrawerTrigger asChild>
@@ -47,7 +47,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </DrawerContent>
             </Drawer>
           </div>
-          <DropdownUserProfile />
+          <div className="ml-auto flex items-center">
+            <DropdownUserProfile />
+          </div>
         </header>
         <main className="p-4 md:p-6">{children}</main>
       </div>
