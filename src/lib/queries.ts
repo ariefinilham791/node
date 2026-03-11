@@ -734,7 +734,14 @@ export async function getOrCreateSession(
     [scheduleId]
   )
   if (Array.isArray(existing) && existing.length > 0) {
-    return existing[0].id
+    const id = existing[0].id as number
+    if (temperature != null || humidity != null) {
+      await pool.execute(
+        "UPDATE monitoring_sessions SET temperature = ?, humidity = ? WHERE id = ?",
+        [temperature ?? null, humidity ?? null, id]
+      )
+    }
+    return id
   }
   const [result] = await pool.execute<ResultSetHeader>(
     "INSERT INTO monitoring_sessions (schedule_id, temperature, humidity, prepared_by) VALUES (?, ?, ?, ?)",

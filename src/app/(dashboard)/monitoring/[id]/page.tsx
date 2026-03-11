@@ -25,8 +25,6 @@ type ServerWithComponents = {
   }[]
 }
 
-type UserOption = { id: number; full_name: string; role: string }
-
 function parseMetricSchema(schema: unknown): MetricField[] {
   if (!Array.isArray(schema)) return []
   return schema.filter(
@@ -73,10 +71,6 @@ export default function MonitoringFormPage() {
   const [humidity, setHumidity] = useState("")
   const [saving, setSaving] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [userOptions, setUserOptions] = useState<UserOption[]>([])
-  const [acknowledgedBy, setAcknowledgedBy] = useState<string>("")
-  const [deptHeadBy, setDeptHeadBy] = useState<string>("")
-  const [approvalNotes, setApprovalNotes] = useState("")
   const [snapshots, setSnapshots] = useState<
     Record<
       number,
@@ -110,14 +104,6 @@ export default function MonitoringFormPage() {
       .then(setServers)
       .catch(() => {})
   }, [scheduleId])
-
-  useEffect(() => {
-    apiGet<UserOption[]>("/api/users")
-      .then(setUserOptions)
-      .catch((e) =>
-        toast.error(e instanceof Error ? e.message : "Gagal memuat user"),
-      )
-  }, [])
 
   function getOrInitSnapshot(serverId: number) {
     if (!snapshots[serverId]) {
@@ -162,9 +148,20 @@ export default function MonitoringFormPage() {
   }
 
   async function handleSave() {
-    if (!sessionId) return
+    if (!scheduleId || !sessionId) return
     setSaving(true)
-    const payload = {
+    try {
+      // Simpan kondisi ruangan (suhu & kelembapan) ke session
+      await fetch(`/api/schedules/${scheduleId}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          temperature: temperature ? Number(temperature) : null,
+          humidity: humidity ? Number(humidity) : null,
+        }),
+      })
+
+      const payload = {
       snapshots: servers.map((s) => {
         const snap = getOrInitSnapshot(s.id)
         return {
@@ -183,28 +180,54 @@ export default function MonitoringFormPage() {
         }
       }),
     }
-    await fetch(`/api/sessions/${sessionId}/snapshots`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-    setSaving(false)
+      const res = await fetch(`/api/sessions/${sessionId}/snapshots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        const msg =
+          (data && typeof data.error === "string" && data.error) ||
+          "Gagal menyimpan snapshot"
+        throw new Error(msg)
+      }
+      toast.success("Draft monitoring berhasil disimpan")
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Gagal menyimpan draft monitoring",
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleSubmit() {
     if (!sessionId) return
     setSaving(true)
-    await handleSave()
-    await fetch(`/api/sessions/${sessionId}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        acknowledgedBy: acknowledgedBy ? Number(acknowledgedBy) : undefined,
-        deptHeadBy: deptHeadBy ? Number(deptHeadBy) : undefined,
-      }),
-    })
-    setSaving(false)
-    setSubmitSuccess(true)
+    try {
+      await handleSave()
+      const res = await fetch(`/api/sessions/${sessionId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        const msg =
+          (data && typeof data.error === "string" && data.error) ||
+          "Gagal submit session"
+        throw new Error(msg)
+      }
+      setSubmitSuccess(true)
+      toast.success("Monitoring berhasil disubmit")
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Gagal submit monitoring",
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!scheduleId) return null
@@ -555,61 +578,6 @@ export default function MonitoringFormPage() {
           </Card>
         )
       })}
-
-      <Card className="mb-8">
-        <h3 className="font-medium text-gray-900 dark:text-gray-50">
-          Persetujuan
-        </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Isi sebelum submit final (opsional; default: user saat ini).
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label>Acknowledged By</Label>
-            <select
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-              value={acknowledgedBy}
-              onChange={(e) => setAcknowledgedBy(e.target.value)}
-            >
-              <option value="">— Pilih user —</option>
-              {userOptions
-                .filter((u) => u.role === "supervisor" || u.role === "dept_head")
-                .map((u) => (
-                  <option key={u.id} value={String(u.id)}>
-                    {u.full_name} ({u.role})
-                  </option>
-                ))}
-            </select>
-          </div>
-          <div>
-            <Label>Dept Head</Label>
-            <select
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-              value={deptHeadBy}
-              onChange={(e) => setDeptHeadBy(e.target.value)}
-            >
-              <option value="">— Pilih user —</option>
-              {userOptions
-                .filter((u) => u.role === "dept_head")
-                .map((u) => (
-                  <option key={u.id} value={String(u.id)}>
-                    {u.full_name}
-                  </option>
-                ))}
-            </select>
-          </div>
-          <div className="sm:col-span-2">
-            <Label>Catatan persetujuan (opsional)</Label>
-            <textarea
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-              rows={2}
-              value={approvalNotes}
-              onChange={(e) => setApprovalNotes(e.target.value)}
-              placeholder="Catatan"
-            />
-          </div>
-        </div>
-      </Card>
 
       <div className="flex gap-4">
         <Button onClick={handleSave} disabled={saving || !sessionId} variant="secondary">
