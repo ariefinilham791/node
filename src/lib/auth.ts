@@ -3,7 +3,6 @@ import { cookies } from "next/headers"
 import {
   getUserById,
   isSessionValid,
-  revokeSessionByJti,
   insertUserSession,
   generateJti,
 } from "./db"

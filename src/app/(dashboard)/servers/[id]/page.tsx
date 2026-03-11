@@ -5,7 +5,7 @@ import { Button } from "@/components/Button"
 import { Input } from "@/components/Input"
 import { Label } from "@/components/Label"
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { toast } from "@/lib/toast"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
@@ -23,10 +23,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { Spinner } from "@/components/ui/Loading"
 import {
   RiAddLine,
-  RiCheckboxCircleFill,
   RiEdit2Line,
   RiEyeLine,
-  RiShutDownLine,
 } from "@remixicon/react"
 
 type Server = {
@@ -116,7 +114,7 @@ export default function ServerDetailPage() {
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Component | null>(null)
 
-  function load() {
+  const load = useCallback(() => {
     if (!serverId) return
     setLoading(true)
     apiGet<{
@@ -131,7 +129,7 @@ export default function ServerDetailPage() {
         setData(null)
       })
       .finally(() => setLoading(false))
-  }
+  }, [serverId])
 
   useEffect(() => {
     load()
@@ -143,7 +141,7 @@ export default function ServerDetailPage() {
     apiGet<{ id: number; name: string }[]>("/api/locations?all=1")
       .then((list) => setLocations(list))
       .catch(() => {})
-  }, [serverId])
+  }, [load])
 
   useEffect(() => {
     fetch("/api/auth/me")

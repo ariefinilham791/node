@@ -183,7 +183,7 @@ export default function DashboardPage() {
                   nameKey="name"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
-                  {(kpis?.donutData ?? []).map((entry, index) => (
+                  {(kpis?.donutData ?? []).map((entry) => (
                     <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#6b7280"} />
                   ))}
                 </Pie>

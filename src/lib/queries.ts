@@ -164,7 +164,7 @@ export async function getServersListWithComponents(): Promise<ServerWithComponen
      ORDER BY sc.server_id, ct.sort_order, sc.slot_index`,
     ids
   )
-  for (const r of (rows ?? []) as any[]) {
+  for (const r of (rows ?? []) as RowDataPacket[]) {
     const sid = Number(r.server_id)
     const arr = componentsByServerId.get(sid) ?? []
     arr.push({

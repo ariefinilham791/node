@@ -2,11 +2,10 @@
 
 import { Card } from "@/components/Card"
 import { Button } from "@/components/Button"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import {
   RiAlarmWarningFill,
-  RiCheckboxCircleFill,
   RiEditBoxLine,
   RiEyeLine,
   RiTimeLine,
@@ -23,7 +22,7 @@ import {
   TableRow,
   TableRoot,
 } from "@/components/Table"
-import { SkeletonLines, SkeletonBlock } from "@/components/ui/Loading"
+import { SkeletonBlock } from "@/components/ui/Loading"
 
 type Schedule = {
   id: number
@@ -39,13 +38,6 @@ type Schedule = {
 }
 
 type Location = { id: number; name: string }
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-  in_progress: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-  overdue: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-}
 
 function statusToBadgeVariant(status: string) {
   switch (status) {
@@ -86,7 +78,7 @@ export default function MonitoringPage() {
   const [filterLocation, setFilterLocation] = useState("")
   const [filterStatus, setFilterStatus] = useState("")
 
-  async function loadSchedules() {
+  const loadSchedules = useCallback(async () => {
     const params = new URLSearchParams()
     if (filterLocation) params.set("locationId", filterLocation)
     if (filterStatus) params.set("status", filterStatus)
@@ -107,11 +99,11 @@ export default function MonitoringPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterLocation, filterStatus])
 
   useEffect(() => {
     loadSchedules()
-  }, [filterLocation, filterStatus])
+  }, [loadSchedules])
 
   useEffect(() => {
     apiGet<Location[]>("/api/locations")

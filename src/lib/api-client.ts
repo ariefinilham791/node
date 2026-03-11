@@ -25,9 +25,15 @@ export async function apiFetch<T>(
   const env = await parseEnvelope<T>(res)
 
   if (!res.ok) {
+    const legacyMessage =
+      env &&
+      typeof env === "object" &&
+      typeof (env as Record<string, unknown>).message === "string"
+        ? String((env as Record<string, unknown>).message)
+        : null
     const message =
       env?.error ||
-      (typeof (env as any)?.message === "string" && (env as any).message) ||
+      legacyMessage ||
       res.statusText ||
       "Request failed"
     throw new ApiClientError(message, res.status)
