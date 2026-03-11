@@ -8,7 +8,6 @@ import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import type { MetricField } from "@/types"
-import { apiGet } from "@/lib/api-client"
 import { toast } from "@/lib/toast"
 
 type ServerWithComponents = {
