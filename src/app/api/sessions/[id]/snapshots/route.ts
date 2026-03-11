@@ -1,11 +1,27 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import {
+  getSessionById,
+  getSessionSnapshotsForForm,
   insertServerSnapshot,
   upsertComponentReading,
 } from "@/lib/queries"
 
 type Context = { params: Promise<{ id: string }> }
+
+export async function GET(_request: Request, context: Context) {
+  const session = await getSession()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  const sessionId = Number((await context.params).id)
+  if (!sessionId) {
+    return NextResponse.json({ error: "Invalid session id" }, { status: 400 })
+  }
+  const sessionRow = await getSessionById(sessionId)
+  const snapshots = await getSessionSnapshotsForForm(sessionId)
+  return NextResponse.json({ session: sessionRow, snapshots })
+}
 
 export async function POST(request: Request, context: Context) {
   const session = await getSession()

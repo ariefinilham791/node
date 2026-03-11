@@ -97,6 +97,51 @@ export default function MonitoringFormPage() {
   }, [scheduleId])
 
   useEffect(() => {
+    if (!sessionId) return
+    fetch(`/api/sessions/${sessionId}/snapshots`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.session) {
+          setTemperature(
+            data.session.temperature != null ? String(data.session.temperature) : "",
+          )
+          setHumidity(
+            data.session.humidity != null ? String(data.session.humidity) : "",
+          )
+        }
+        if (Array.isArray(data.snapshots)) {
+          const next: typeof snapshots = {}
+          for (const s of data.snapshots as Array<{
+            server_id: number
+            mem_used_pct: number | null
+            cpu_load_pct: number | null
+            email_pop3: string
+            email_imap: string
+            web_service: string
+            overall_status: string
+            remark: string | null
+            readings: Record<number, Record<string, string>>
+          }>) {
+            next[s.server_id] = {
+              mem_used_pct:
+                s.mem_used_pct != null ? String(s.mem_used_pct) : "",
+              cpu_load_pct:
+                s.cpu_load_pct != null ? String(s.cpu_load_pct) : "",
+              email_pop3: s.email_pop3 ?? "N/A",
+              email_imap: s.email_imap ?? "N/A",
+              web_service: s.web_service ?? "N/A",
+              overall_status: s.overall_status ?? "UNKNOWN",
+              remark: s.remark ?? "",
+              readings: s.readings ?? {},
+            }
+          }
+          setSnapshots(next)
+        }
+      })
+      .catch(() => {})
+  }, [sessionId])
+
+  useEffect(() => {
     if (!scheduleId) return
     fetch(`/api/schedules/${scheduleId}/servers`)
       .then((r) => r.json())
