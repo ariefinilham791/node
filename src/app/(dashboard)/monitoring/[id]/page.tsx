@@ -770,7 +770,16 @@ export default function MonitoringFormPage() {
                                 </Label>
                                 <Input
                                   type="number"
-                                  value={compReadings.used ?? ""}
+                                  value={
+                                    typeof (compReadings as Record<string, unknown>).used ===
+                                      "string" ||
+                                    typeof (compReadings as Record<string, unknown>).used ===
+                                      "number"
+                                      ? String(
+                                          (compReadings as Record<string, unknown>).used,
+                                        )
+                                      : ""
+                                  }
                                   onChange={(e) =>
                                     setSnapshots((prev) => ({
                                       ...prev,
