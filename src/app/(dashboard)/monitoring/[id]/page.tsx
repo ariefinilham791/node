@@ -512,8 +512,16 @@ export default function MonitoringFormPage() {
                             {server.components.map((comp) => {
                               const meta = getUsedFieldMeta(comp)
                               const compReadings = snap.readings[comp.id] ?? {}
-                              const used = compReadings.used ?? ""
-                              const status = compReadings.status ?? ""
+                              const usedRaw = (compReadings as Record<string, unknown>).used
+                              const statusRaw = (compReadings as Record<string, unknown>).status
+                              const usedText =
+                                usedRaw == null || String(usedRaw).trim() === ""
+                                  ? "—"
+                                  : String(usedRaw)
+                              const statusText =
+                                statusRaw == null || String(statusRaw).trim() === ""
+                                  ? "—"
+                                  : String(statusRaw)
                               return (
                                 <div key={comp.id} className="rounded border border-gray-200 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-900/50">
                                   <p className="mb-1 font-medium text-gray-800 dark:text-gray-200">{comp.label} ({comp.type_name})</p>
@@ -529,13 +537,13 @@ export default function MonitoringFormPage() {
                                         Used{meta.unit ? ` (${meta.unit})` : ""}
                                       </dt>
                                       <dd className="text-gray-900 dark:text-gray-50">
-                                        {used || "—"}
+                                        {usedText}
                                       </dd>
                                     </div>
                                     <div>
                                       <dt className="text-gray-500 dark:text-gray-400">Checklist</dt>
                                       <dd className="text-gray-900 dark:text-gray-50">
-                                        {status || "—"}
+                                        {statusText}
                                       </dd>
                                     </div>
                                   </dl>
