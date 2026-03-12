@@ -10,6 +10,19 @@ import {
 
 type Context = { params: Promise<{ id: string }> }
 
+type SnapshotPayload = {
+  server_id: number
+  mem_used_pct?: number | null
+  cpu_load_pct?: number | null
+  email_pop3?: string
+  email_imap?: string
+  web_service?: string
+  av_pattern?: string | null
+  overall_status?: string
+  remark?: string | null
+  readings?: Array<{ server_component_id: number; metrics?: Record<string, unknown> }>
+}
+
 export async function GET(_request: Request, context: Context) {
   const session = await getSession()
   if (!session) {
@@ -34,10 +47,12 @@ export async function POST(request: Request, context: Context) {
     return NextResponse.json({ error: "Invalid session id" }, { status: 400 })
   }
   const body = await request.json().catch(() => ({}))
-  const snapshots = Array.isArray(body.snapshots) ? body.snapshots : []
+  const snapshots: SnapshotPayload[] = Array.isArray(body.snapshots)
+    ? body.snapshots
+    : []
 
   await Promise.all(
-    snapshots.map(async (snap) => {
+    snapshots.map(async (snap: SnapshotPayload) => {
       const snapshotId = await insertServerSnapshot({
         session_id: sessionId,
         server_id: Number(snap.server_id),
