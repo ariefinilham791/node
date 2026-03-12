@@ -147,7 +147,7 @@ export default function MonitoringFormPage() {
         web_service: string
         overall_status: string
         remark: string
-        readings: Record<number, Record<string, string>>
+        readings: Record<number, Record<string, unknown>>
       }
     >
   >({})
@@ -199,7 +199,7 @@ export default function MonitoringFormPage() {
             web_service: string
             overall_status: string
             remark: string | null
-            readings: Record<number, Record<string, string>>
+            readings: Record<number, Record<string, unknown>>
           }>) {
             next[s.server_id] = {
               mem_used_pct:
