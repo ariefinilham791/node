@@ -658,9 +658,17 @@ export default function MonitoringFormPage() {
                               <Label>Volumes</Label>
                               <div className="mt-2 space-y-2">
                                 {volumes.map((v) => {
-                                  const volMetrics =
-                                    (compReadings.volumes as Record<string, unknown> | undefined) ??
-                                    {}
+                                  const readingAny = compReadings as unknown as Record<
+                                    string,
+                                    unknown
+                                  >
+                                  const volMetricsRaw = readingAny.volumes
+                                  const volMetrics: Record<string, unknown> =
+                                    volMetricsRaw &&
+                                    typeof volMetricsRaw === "object" &&
+                                    !Array.isArray(volMetricsRaw)
+                                      ? (volMetricsRaw as Record<string, unknown>)
+                                      : {}
                                   const row =
                                     (volMetrics[v.name] as Record<string, unknown> | undefined) ??
                                     {}
@@ -686,7 +694,7 @@ export default function MonitoringFormPage() {
                                             value={typeof used === "string" || typeof used === "number" ? String(used) : ""}
                                             onChange={(e) => {
                                               const nextVols: Record<string, unknown> = {
-                                                ...(compReadings.volumes as Record<string, unknown> | undefined),
+                                                ...(volMetrics as Record<string, unknown>),
                                               }
                                               nextVols[v.name] = {
                                                 ...(nextVols[v.name] as Record<string, unknown> | undefined),
@@ -713,7 +721,7 @@ export default function MonitoringFormPage() {
                                             value={typeof status === "string" ? status : ""}
                                             onChange={(val) => {
                                               const nextVols: Record<string, unknown> = {
-                                                ...(compReadings.volumes as Record<string, unknown> | undefined),
+                                                ...(volMetrics as Record<string, unknown>),
                                               }
                                               nextVols[v.name] = {
                                                 ...(nextVols[v.name] as Record<string, unknown> | undefined),
