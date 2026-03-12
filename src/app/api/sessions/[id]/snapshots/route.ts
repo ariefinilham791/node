@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import {
+  deleteSessionSnapshots,
   getSessionById,
   getSessionSnapshotsForForm,
   insertServerSnapshot,
@@ -94,5 +95,18 @@ export async function POST(request: Request, context: Context) {
   if (snapshots.length > 0) {
     await markScheduleInProgressBySessionId(sessionId)
   }
+  return NextResponse.json({ success: true })
+}
+
+export async function DELETE(_request: Request, context: Context) {
+  const session = await getSession()
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  const sessionId = Number((await context.params).id)
+  if (!sessionId) {
+    return NextResponse.json({ error: "Invalid session id" }, { status: 400 })
+  }
+  await deleteSessionSnapshots(sessionId)
   return NextResponse.json({ success: true })
 }

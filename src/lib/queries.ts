@@ -942,6 +942,17 @@ export async function upsertComponentReading(
   )
 }
 
+/** Hapus semua snapshot & readings untuk session (untuk fitur Reset). */
+export async function deleteSessionSnapshots(sessionId: number): Promise<void> {
+  await pool.execute(
+    "DELETE FROM component_readings WHERE snapshot_id IN (SELECT id FROM server_snapshots WHERE session_id = ?)",
+    [sessionId]
+  )
+  await pool.execute("DELETE FROM server_snapshots WHERE session_id = ?", [
+    sessionId,
+  ])
+}
+
 // ─── Submit session ────────────────────────────────────────────────────────
 export async function submitSession(
   sessionId: number,

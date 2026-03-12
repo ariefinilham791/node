@@ -7,8 +7,11 @@ import { Label } from "@/components/Label"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { RiArrowDownSLine, RiArrowRightSLine, RiEdit2Line, RiRefreshLine } from "@remixicon/react"
 import type { MetricField } from "@/types"
 import { toast } from "@/lib/toast"
+import { SkeletonBlock } from "@/components/ui/Loading"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 type ServerWithComponents = {
   id: number
@@ -66,6 +69,13 @@ export default function MonitoringFormPage() {
   const scheduleId = Number(params.id)
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [servers, setServers] = useState<ServerWithComponents[]>([])
+  const [loadingSession, setLoadingSession] = useState(true)
+  const [loadingServers, setLoadingServers] = useState(true)
+  const [loadingDraft, setLoadingDraft] = useState(false)
+  const [viewMode, setViewMode] = useState<"form" | "list">("form")
+  const [expandedServerId, setExpandedServerId] = useState<number | null>(null)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [temperature, setTemperature] = useState("")
   const [humidity, setHumidity] = useState("")
   const [saving, setSaving] = useState(false)
@@ -88,16 +98,29 @@ export default function MonitoringFormPage() {
 
   useEffect(() => {
     if (!scheduleId) return
+    setLoadingSession(true)
     fetch(`/api/schedules/${scheduleId}/session`)
       .then((r) => r.json())
       .then((data) => {
-        setSessionId(data.sessionId)
+        setSessionId(data.sessionId ?? null)
       })
-      .catch(() => {})
+      .catch(() => setSessionId(null))
+      .finally(() => setLoadingSession(false))
+  }, [scheduleId])
+
+  useEffect(() => {
+    if (!scheduleId) return
+    setLoadingServers(true)
+    fetch(`/api/schedules/${scheduleId}/servers`)
+      .then((r) => r.json())
+      .then(setServers)
+      .catch(() => setServers([]))
+      .finally(() => setLoadingServers(false))
   }, [scheduleId])
 
   useEffect(() => {
     if (!sessionId) return
+    setLoadingDraft(true)
     fetch(`/api/sessions/${sessionId}/snapshots`)
       .then((r) => r.json())
       .then((data) => {
@@ -136,18 +159,12 @@ export default function MonitoringFormPage() {
             }
           }
           setSnapshots(next)
+          if (Object.keys(next).length > 0) setViewMode("list")
         }
       })
       .catch(() => {})
+      .finally(() => setLoadingDraft(false))
   }, [sessionId])
-
-  useEffect(() => {
-    if (!scheduleId) return
-    fetch(`/api/schedules/${scheduleId}/servers`)
-      .then((r) => r.json())
-      .then(setServers)
-      .catch(() => {})
-  }, [scheduleId])
 
   function getOrInitSnapshot(serverId: number) {
     if (!snapshots[serverId]) {
@@ -274,11 +291,36 @@ export default function MonitoringFormPage() {
     }
   }
 
+  const pageLoading =
+    loadingSession ||
+    loadingServers ||
+    (sessionId !== null && loadingDraft)
+  const hasSnapshotData = Object.keys(snapshots).length > 0
+
+  async function handleResetData() {
+    if (!sessionId) return
+    setResetting(true)
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/snapshots`, {
+        method: "DELETE",
+      })
+      if (!res.ok) throw new Error("Gagal reset")
+      setSnapshots({})
+      setViewMode("form")
+      setResetConfirmOpen(false)
+      toast.success("Data monitoring telah dikosongkan")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal reset data")
+    } finally {
+      setResetting(false)
+    }
+  }
+
   if (!scheduleId) return null
 
   return (
     <main>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <div>
           <Link
             href="/monitoring"
@@ -290,7 +332,7 @@ export default function MonitoringFormPage() {
             Form Monitoring — Jadwal #{scheduleId}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {sessionId && (
             <a
               href={`/api/sessions/${sessionId}/export/excel`}
@@ -301,9 +343,131 @@ export default function MonitoringFormPage() {
               Export Excel
             </a>
           )}
+          {!pageLoading && hasSnapshotData && (
+            <>
+              {viewMode === "list" ? (
+                <Button variant="secondary" className="!py-2" onClick={() => setViewMode("form")}>
+                  <RiEdit2Line className="mr-1.5 size-4" />
+                  Edit
+                </Button>
+              ) : (
+                <Button variant="light" className="!py-2" onClick={() => setViewMode("list")}>
+                  Lihat ringkasan
+                </Button>
+              )}
+              <Button variant="secondary" className="!py-2" onClick={() => setResetConfirmOpen(true)}>
+                <RiRefreshLine className="mr-1.5 size-4" />
+                Reset data
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
+      {pageLoading && (
+        <div className="space-y-6">
+          <Card className="p-6">
+            <SkeletonBlock className="mb-4 h-5 w-48" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SkeletonBlock className="h-10 w-full" />
+              <SkeletonBlock className="h-10 w-full" />
+            </div>
+          </Card>
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="overflow-hidden p-0">
+              <div className="flex items-center justify-between p-4">
+                <SkeletonBlock className="h-6 w-56" />
+                <SkeletonBlock className="h-8 w-24" />
+              </div>
+              <div className="border-t border-gray-200 px-4 py-6 dark:border-gray-700">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <SkeletonBlock key={j} className="h-10 w-full" />
+                  ))}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!pageLoading && viewMode === "list" && hasSnapshotData && (
+        <>
+          <Card className="mb-6 p-4">
+            <h3 className="font-medium text-gray-900 dark:text-gray-50">Kondisi Ruangan</h3>
+            <div className="mt-2 flex gap-6 text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Suhu: {temperature ? `${temperature} °C` : "—"}</span>
+              <span className="text-gray-600 dark:text-gray-400">Kelembaban: {humidity ? `${humidity}%` : "—"}</span>
+            </div>
+          </Card>
+          <div className="space-y-2">
+            {servers.map((server) => {
+              const snap = snapshots[server.id]
+              const expanded = expandedServerId === server.id
+              const hasData = !!snap
+              return (
+                <Card key={server.id} className="overflow-hidden p-0">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                    onClick={() => setExpandedServerId(expanded ? null : server.id)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {expanded ? <RiArrowDownSLine className="size-5 text-gray-500" /> : <RiArrowRightSLine className="size-5 text-gray-500" />}
+                      <span className="font-medium text-gray-900 dark:text-gray-50">{server.hostname}</span>
+                      {server.ip_address && <span className="text-sm text-gray-500">{server.ip_address}</span>}
+                      {!hasData && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">Belum diisi</span>}
+                    </div>
+                  </button>
+                  {expanded && (
+                    <div className="border-t border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+                      {hasData && snap ? (
+                        <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                          <div><dt className="text-gray-500 dark:text-gray-400">Memory used (%)</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.mem_used_pct || "—"}</dd></div>
+                          <div><dt className="text-gray-500 dark:text-gray-400">CPU load (%)</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.cpu_load_pct || "—"}</dd></div>
+                          <div><dt className="text-gray-500 dark:text-gray-400">Email POP3 / IMAP / Web</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.email_pop3} / {snap.email_imap} / {snap.web_service}</dd></div>
+                          <div><dt className="text-gray-500 dark:text-gray-400">Overall status</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.overall_status}</dd></div>
+                          {snap.remark && <div className="sm:col-span-2 lg:col-span-4"><dt className="text-gray-500 dark:text-gray-400">Remark</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.remark}</dd></div>}
+                        </dl>
+                      ) : null}
+                      {hasData && server.components?.length > 0 && snap && (
+                        <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                          <h4 className="mb-2 text-xs font-medium uppercase tracking text-gray-500 dark:text-gray-400">Komponen</h4>
+                          <div className="space-y-3">
+                            {server.components.map((comp) => {
+                              const fields = parseMetricSchema(comp.metric_schema)
+                              const compReadings = snap.readings[comp.id] ?? {}
+                              if (fields.length === 0) return null
+                              return (
+                                <div key={comp.id} className="rounded border border-gray-200 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                  <p className="mb-1 font-medium text-gray-800 dark:text-gray-200">{comp.label} ({comp.type_name})</p>
+                                  <dl className="grid gap-1 sm:grid-cols-2">
+                                    {fields.map((field) => (
+                                      <div key={field.key}>
+                                        <dt className="text-gray-500 dark:text-gray-400">{field.label}{field.unit ? ` (${field.unit})` : ""}</dt>
+                                        <dd className="text-gray-900 dark:text-gray-50">{compReadings[field.key] ?? "—"}</dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {!hasData && <p className="text-sm text-gray-500 dark:text-gray-400">Data server ini belum diisi. Klik Edit untuk mengisi form.</p>}
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+          <ConfirmDialog open={resetConfirmOpen} title="Reset data monitoring?" description="Semua data yang sudah diisi (per server) akan dihapus dan form dikosongkan. Anda bisa mengisi ulang dari form." confirmText="Ya, kosongkan" cancelText="Batal" variant="destructive" loading={resetting} onConfirm={handleResetData} onCancel={() => setResetConfirmOpen(false)} />
+        </>
+      )}
+
+      {!pageLoading && (viewMode === "form" || !hasSnapshotData) && (
+        <>
       {submitSuccess && (
         <Card className="mb-6 border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30">
           <p className="font-medium text-emerald-800 dark:text-emerald-200">
@@ -631,6 +795,8 @@ export default function MonitoringFormPage() {
           {saving ? "Memproses..." : "Submit final"}
         </Button>
       </div>
+        </>
+      )}
     </main>
   )
 }
