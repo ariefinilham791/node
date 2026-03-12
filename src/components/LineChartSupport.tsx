@@ -542,6 +542,7 @@ export const LineChartSupport = React.forwardRef<
     const { pointerEvents, height, points, className, payload, width } = props
     const firstPayload = payload?.[0]?.payload as Record<string, unknown> | undefined
     const label = firstPayload?.[index] // index key in row
+    const labelText = label == null ? "" : String(label)
     const firstPoint = points?.[0]
     if (!firstPoint) return null
     const { x, y } = firstPoint
@@ -588,7 +589,7 @@ export const LineChartSupport = React.forwardRef<
             y={textHeight / 2 + padding + 5}
             textAnchor="middle"
           >
-            {label}
+            {labelText}
           </text>
         </g>
       </>
