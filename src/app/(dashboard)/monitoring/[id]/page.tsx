@@ -801,7 +801,14 @@ export default function MonitoringFormPage() {
                               <div>
                                 <Label>Checklist</Label>
                                 <ChoiceButtons
-                                  value={compReadings.status ?? ""}
+                                  value={
+                                    typeof (compReadings as Record<string, unknown>).status ===
+                                      "string"
+                                      ? String(
+                                          (compReadings as Record<string, unknown>).status,
+                                        )
+                                      : ""
+                                  }
                                   onChange={(v) =>
                                     setSnapshots((prev) => ({
                                       ...prev,
