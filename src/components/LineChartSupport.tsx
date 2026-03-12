@@ -538,14 +538,13 @@ export const LineChartSupport = React.forwardRef<
     ...other
   } = props
 
-  if (!Array.isArray(data) || data.length === 0) {
-    return <div ref={ref} className={cx("h-80 w-full", className)} {...other} />
-  }
-
   function CustomCursor(props: any) {
     const { pointerEvents, height, points, className, payload, width } = props
-    const label = payload[0]?.payload?.[index] // change it to your name of the index
-    const { x, y } = points[0]
+    const firstPayload = payload?.[0]?.payload as Record<string, unknown> | undefined
+    const label = firstPayload?.[index] // index key in row
+    const firstPoint = points?.[0]
+    if (!firstPoint) return null
+    const { x, y } = firstPoint
     const textWidth = 60 // adjust based on your text size
     const textHeight = 15 // adjust based on your text size
     const padding = 3
@@ -696,7 +695,9 @@ export const LineChartSupport = React.forwardRef<
             tick={{ transform: "translate(0, 6)" }}
             ticks={
               startEndOnly
-                ? [data[0][index], data[data.length - 1][index]]
+                ? data.length >= 2
+                  ? [data[0]?.[index], data[data.length - 1]?.[index]]
+                  : undefined
                 : undefined
             }
             fill=""
