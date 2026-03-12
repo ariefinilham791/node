@@ -91,6 +91,47 @@ function getDiskVolumes(specs: Record<string, unknown> | null | undefined): Arra
     .filter(Boolean) as Array<{ name: string; standard_gb: number | null }>
 }
 
+function parseUsedPct(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v)
+    if (Number.isFinite(n)) return n
+  }
+  return null
+}
+
+function computeDiskUsedSummary(volumes: Array<{ name: string; standard_gb: number | null }>, volMetrics: Record<string, unknown>) {
+  // Weighted average by standard_gb when available, else fallback to max used%
+  let weightedSum = 0
+  let weightTotal = 0
+  let maxUsed: number | null = null
+  let anyFail = false
+  let anyOk = false
+  let anyNa = false
+
+  for (const v of volumes) {
+    const row = (volMetrics[v.name] as Record<string, unknown> | undefined) ?? {}
+    const usedPct = parseUsedPct(row.used)
+    const status = row.status != null ? String(row.status) : ""
+    if (status === "FAIL") anyFail = true
+    else if (status === "OK") anyOk = true
+    else if (status === "N/A" || status === "") anyNa = true
+
+    if (usedPct != null) {
+      maxUsed = maxUsed == null ? usedPct : Math.max(maxUsed, usedPct)
+      if (v.standard_gb != null && Number.isFinite(v.standard_gb)) {
+        weightedSum += usedPct * v.standard_gb
+        weightTotal += v.standard_gb
+      }
+    }
+  }
+
+  const usedSummary =
+    weightTotal > 0 ? weightedSum / weightTotal : maxUsed
+  const statusSummary = anyFail ? "FAIL" : anyOk ? "OK" : anyNa ? "N/A" : ""
+  return { usedSummary, statusSummary }
+}
+
 function ChoiceButtons({
   value,
   onChange,
@@ -663,8 +704,34 @@ export default function MonitoringFormPage() {
 
                           {volumes.length > 0 ? (
                             <div className="sm:col-span-2 lg:col-span-2">
-                              <Label>Volumes</Label>
+                              <Label>Disk (summary)</Label>
                               <div className="mt-2 space-y-2">
+                                {(() => {
+                                  const readingAny = compReadings as unknown as Record<string, unknown>
+                                  const volMetricsRaw = readingAny.volumes
+                                  const volMetrics: Record<string, unknown> =
+                                    volMetricsRaw &&
+                                    typeof volMetricsRaw === "object" &&
+                                    !Array.isArray(volMetricsRaw)
+                                      ? (volMetricsRaw as Record<string, unknown>)
+                                      : {}
+                                  const { usedSummary, statusSummary } = computeDiskUsedSummary(volumes, volMetrics)
+                                  return (
+                                    <div className="rounded-md border border-gray-200 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-50">
+                                          {statusSummary || "—"}
+                                          <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                                            Used: {usedSummary == null ? "—" : `${usedSummary.toFixed(1)}%`}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })()}
+                                <div className="pt-1">
+                                  <Label>Volumes</Label>
+                                </div>
                                 {volumes.map((v) => {
                                   const readingAny = compReadings as unknown as Record<
                                     string,
