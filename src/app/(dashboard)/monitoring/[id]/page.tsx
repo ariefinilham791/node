@@ -72,6 +72,25 @@ function getUsedFieldMeta(comp: ServerWithComponents["components"][number]) {
   }
 }
 
+function getDiskVolumes(specs: Record<string, unknown> | null | undefined): Array<{ name: string; standard_gb: number | null }> {
+  if (!specs) return []
+  const raw = (specs as Record<string, unknown>).volumes
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((r) => {
+      if (!r || typeof r !== "object") return null
+      const o = r as Record<string, unknown>
+      const name = o.name != null ? String(o.name).trim() : ""
+      const standard_gb =
+        o.standard_gb == null || String(o.standard_gb).trim() === ""
+          ? null
+          : Number(o.standard_gb)
+      if (!name) return null
+      return { name, standard_gb }
+    })
+    .filter(Boolean) as Array<{ name: string; standard_gb: number | null }>
+}
+
 function ChoiceButtons({
   value,
   onChange,
@@ -240,6 +259,17 @@ export default function MonitoringFormPage() {
     if (!snap) return false
     for (const comp of server.components ?? []) {
       const readings = snap.readings[comp.id] ?? {}
+      // volumes: { [name]: { used, status } }
+      const vols = (readings as Record<string, unknown>).volumes
+      if (vols && typeof vols === "object") {
+        for (const v of Object.values(vols as Record<string, unknown>)) {
+          if (v && typeof v === "object") {
+            for (const vv of Object.values(v as Record<string, unknown>)) {
+              if (vv != null && String(vv).trim() !== "") return true
+            }
+          }
+        }
+      }
       for (const v of Object.values(readings)) {
         if (v != null && String(v).trim() !== "") return true
       }
@@ -606,6 +636,7 @@ export default function MonitoringFormPage() {
                   {server.components.map((comp) => {
                     const compReadings = snap.readings[comp.id] ?? {}
                     const meta = getUsedFieldMeta(comp)
+                    const volumes = getDiskVolumes(comp.specs)
                     return (
                       <div
                         key={comp.id}
@@ -621,57 +652,155 @@ export default function MonitoringFormPage() {
                               {formatStandard(comp.specs)}
                             </div>
                           </div>
-                          <div>
-                            <Label>
-                              Used{meta.unit ? ` (${meta.unit})` : ""}
-                            </Label>
-                            <Input
-                              type="number"
-                              value={compReadings.used ?? ""}
-                              onChange={(e) =>
-                                setSnapshots((prev) => ({
-                                  ...prev,
-                                  [server.id]: {
-                                    ...getOrInitSnapshot(server.id),
-                                    readings: {
-                                      ...getOrInitSnapshot(server.id).readings,
-                                      [comp.id]: {
-                                        ...compReadings,
-                                        used: e.target.value,
+
+                          {volumes.length > 0 ? (
+                            <div className="sm:col-span-2 lg:col-span-2">
+                              <Label>Volumes</Label>
+                              <div className="mt-2 space-y-2">
+                                {volumes.map((v) => {
+                                  const volMetrics =
+                                    (compReadings.volumes as Record<string, unknown> | undefined) ??
+                                    {}
+                                  const row =
+                                    (volMetrics[v.name] as Record<string, unknown> | undefined) ??
+                                    {}
+                                  const used = row.used ?? ""
+                                  const status = row.status ?? ""
+                                  return (
+                                    <div
+                                      key={v.name}
+                                      className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-950"
+                                    >
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-50">
+                                          {v.name}
+                                          {v.standard_gb != null ? (
+                                            <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                                              Std: {v.standard_gb} GB
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Input
+                                            type="number"
+                                            value={typeof used === "string" || typeof used === "number" ? String(used) : ""}
+                                            onChange={(e) => {
+                                              const nextVols: Record<string, unknown> = {
+                                                ...(compReadings.volumes as Record<string, unknown> | undefined),
+                                              }
+                                              nextVols[v.name] = {
+                                                ...(nextVols[v.name] as Record<string, unknown> | undefined),
+                                                used: e.target.value,
+                                              }
+                                              setSnapshots((prev) => ({
+                                                ...prev,
+                                                [server.id]: {
+                                                  ...getOrInitSnapshot(server.id),
+                                                  readings: {
+                                                    ...getOrInitSnapshot(server.id).readings,
+                                                    [comp.id]: {
+                                                      ...compReadings,
+                                                      volumes: nextVols,
+                                                    },
+                                                  },
+                                                },
+                                              }))
+                                            }}
+                                            className="w-24"
+                                            placeholder="Used %"
+                                          />
+                                          <ChoiceButtons
+                                            value={typeof status === "string" ? status : ""}
+                                            onChange={(val) => {
+                                              const nextVols: Record<string, unknown> = {
+                                                ...(compReadings.volumes as Record<string, unknown> | undefined),
+                                              }
+                                              nextVols[v.name] = {
+                                                ...(nextVols[v.name] as Record<string, unknown> | undefined),
+                                                status: val,
+                                              }
+                                              setSnapshots((prev) => ({
+                                                ...prev,
+                                                [server.id]: {
+                                                  ...getOrInitSnapshot(server.id),
+                                                  readings: {
+                                                    ...getOrInitSnapshot(server.id).readings,
+                                                    [comp.id]: {
+                                                      ...compReadings,
+                                                      volumes: nextVols,
+                                                    },
+                                                  },
+                                                },
+                                              }))
+                                            }}
+                                            options={[
+                                              { value: "OK", label: "OK", variant: "primary" },
+                                              { value: "FAIL", label: "FAIL", variant: "destructive" },
+                                              { value: "N/A", label: "N/A", variant: "light" },
+                                            ]}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div>
+                                <Label>
+                                  Used{meta.unit ? ` (${meta.unit})` : ""}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={compReadings.used ?? ""}
+                                  onChange={(e) =>
+                                    setSnapshots((prev) => ({
+                                      ...prev,
+                                      [server.id]: {
+                                        ...getOrInitSnapshot(server.id),
+                                        readings: {
+                                          ...getOrInitSnapshot(server.id).readings,
+                                          [comp.id]: {
+                                            ...compReadings,
+                                            used: e.target.value,
+                                          },
+                                        },
                                       },
-                                    },
-                                  },
-                                }))
-                              }
-                              className="mt-1"
-                            />
-                          </div>
-                          <div>
-                            <Label>Checklist</Label>
-                            <ChoiceButtons
-                              value={compReadings.status ?? ""}
-                              onChange={(v) =>
-                                setSnapshots((prev) => ({
-                                  ...prev,
-                                  [server.id]: {
-                                    ...getOrInitSnapshot(server.id),
-                                    readings: {
-                                      ...getOrInitSnapshot(server.id).readings,
-                                      [comp.id]: {
-                                        ...compReadings,
-                                        status: v,
+                                    }))
+                                  }
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label>Checklist</Label>
+                                <ChoiceButtons
+                                  value={compReadings.status ?? ""}
+                                  onChange={(v) =>
+                                    setSnapshots((prev) => ({
+                                      ...prev,
+                                      [server.id]: {
+                                        ...getOrInitSnapshot(server.id),
+                                        readings: {
+                                          ...getOrInitSnapshot(server.id).readings,
+                                          [comp.id]: {
+                                            ...compReadings,
+                                            status: v,
+                                          },
+                                        },
                                       },
-                                    },
-                                  },
-                                }))
-                              }
-                              options={[
-                                { value: "OK", label: "OK", variant: "primary" },
-                                { value: "ERROR", label: "ERROR", variant: "destructive" },
-                                { value: "N/A", label: "N/A", variant: "light" },
-                              ]}
-                            />
-                          </div>
+                                    }))
+                                  }
+                                  options={[
+                                    { value: "OK", label: "OK", variant: "primary" },
+                                    { value: "FAIL", label: "FAIL", variant: "destructive" },
+                                    { value: "N/A", label: "N/A", variant: "light" },
+                                  ]}
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     )

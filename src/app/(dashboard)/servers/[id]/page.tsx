@@ -28,6 +28,8 @@ import {
   RiEyeLine,
 } from "@remixicon/react"
 
+type DiskVolumeSpec = { name: string; standard_gb: number | "" }
+
 type Server = {
   id: number
   hostname: string
@@ -68,7 +70,7 @@ type ComponentReading = {
   metrics: unknown
 }
 
-type ComponentType = { id: number; name: string }
+type ComponentType = { id: number; name: string; category: string; unit_label: string | null }
 
 function serverStatusVariant(status: string) {
   return status === "active" ? ("success" as const) : ("neutral" as const)
@@ -111,6 +113,10 @@ export default function ServerDetailPage() {
   const [compTypeId, setCompTypeId] = useState("")
   const [compCapacityGb, setCompCapacityGb] = useState("")
   const [compSerialNumber, setCompSerialNumber] = useState("")
+  const [compModel, setCompModel] = useState("")
+  const [compCpuCode, setCompCpuCode] = useState("")
+  const [compPsuWatt, setCompPsuWatt] = useState("")
+  const [compVolumes, setCompVolumes] = useState<DiskVolumeSpec[]>([])
   const [compSpecsJson, setCompSpecsJson] = useState("")
   const [compSaving, setCompSaving] = useState(false)
   const [role, setRole] = useState<string>("")
@@ -139,7 +145,14 @@ export default function ServerDetailPage() {
     load()
     apiGet<ComponentType[]>("/api/component-types")
       .then((list) =>
-        setComponentTypes(list.map((c) => ({ id: c.id, name: c.name }))),
+        setComponentTypes(
+          list.map((c) => ({
+            id: c.id,
+            name: (c as unknown as { name: string }).name,
+            category: (c as unknown as { category: string }).category,
+            unit_label: (c as unknown as { unit_label: string | null }).unit_label ?? null,
+          })),
+        ),
       )
       .catch(() => {})
     apiGet<{ id: number; name: string }[]>("/api/locations?all=1")
@@ -188,8 +201,29 @@ export default function ServerDetailPage() {
     setCompTypeId("")
     setCompCapacityGb("")
     setCompSerialNumber("")
+    setCompModel("")
+    setCompCpuCode("")
+    setCompPsuWatt("")
+    setCompVolumes([])
     setCompSpecsJson("")
     setCompModal(true)
+  }
+
+  function normalizeVolumes(v: unknown): DiskVolumeSpec[] {
+    if (!Array.isArray(v)) return []
+    return v
+      .map((row) => {
+        if (!row || typeof row !== "object") return null
+        const r = row as Record<string, unknown>
+        const name = r.name != null ? String(r.name) : ""
+        const standard_gb =
+          r.standard_gb != null && String(r.standard_gb).trim() !== ""
+            ? Number(r.standard_gb)
+            : ""
+        if (!name.trim()) return null
+        return { name: name.trim(), standard_gb } satisfies DiskVolumeSpec
+      })
+      .filter(Boolean) as DiskVolumeSpec[]
   }
 
   function openEditComponent(c: Component) {
@@ -207,9 +241,26 @@ export default function ServerDetailPage() {
           : "",
     )
     setCompSerialNumber(specs.serial_number != null ? String(specs.serial_number) : "")
+    setCompModel(specs.model != null ? String(specs.model) : "")
+    setCompCpuCode(specs.cpu_code != null ? String(specs.cpu_code) : "")
+    setCompPsuWatt(specs.watt != null ? String(specs.watt) : "")
+    setCompVolumes(normalizeVolumes(specs.volumes))
     setCompSpecsJson(Object.keys(specs).length ? JSON.stringify(specs, null, 2) : "")
     setCompModal(true)
   }
+
+  const selectedTypeName =
+    compEdit?.type_name ??
+    componentTypes.find((c) => String(c.id) === String(compTypeId))?.name ??
+    ""
+  const selectedTypeCategory =
+    componentTypes.find((c) => String(c.id) === String(compTypeId))?.category ??
+    compEdit?.category ??
+    ""
+  const selectedTypeKey = `${selectedTypeName} ${selectedTypeCategory}`.toLowerCase()
+  const isDiskType = selectedTypeKey.includes("disk") || selectedTypeKey.includes("storage")
+  const isCpuType = selectedTypeKey.includes("cpu") || selectedTypeKey.includes("processor")
+  const isPsuType = selectedTypeKey.includes("psu") || selectedTypeKey.includes("power")
 
   async function handleSaveComponent() {
     if (!compLabel.trim()) return
@@ -232,8 +283,30 @@ export default function ServerDetailPage() {
         }
       } else {
         const next: Record<string, unknown> = {}
-        if (compCapacityGb.trim() !== "") next.capacity_gb = Number(compCapacityGb)
-        if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+        if (isDiskType) {
+          if (compCapacityGb.trim() !== "") next.capacity_gb = Number(compCapacityGb)
+          if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+          if (compModel.trim() !== "") next.model = compModel.trim()
+          const vols = compVolumes
+            .map((v) => ({
+              name: v.name.trim(),
+              standard_gb:
+                v.standard_gb === "" ? null : Number(v.standard_gb),
+            }))
+            .filter((v) => v.name)
+          if (vols.length) next.volumes = vols
+        } else if (isCpuType) {
+          if (compCpuCode.trim() !== "") next.cpu_code = compCpuCode.trim()
+          if (compModel.trim() !== "") next.model = compModel.trim()
+          if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+        } else if (isPsuType) {
+          if (compPsuWatt.trim() !== "") next.watt = Number(compPsuWatt)
+          if (compModel.trim() !== "") next.model = compModel.trim()
+          if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+        } else {
+          if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+          if (compModel.trim() !== "") next.model = compModel.trim()
+        }
         specs = Object.keys(next).length ? next : null
       }
 
@@ -603,27 +676,190 @@ export default function ServerDetailPage() {
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-300">
                 Isi <span className="font-medium">Standard</span> di sini (master). Saat monitoring nanti cukup pilih OK/FAIL/N/A dan isi Used (%).
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Capacity (GB)</Label>
-                  <Input
-                    type="number"
-                    value={compCapacityGb}
-                    onChange={(e) => setCompCapacityGb(e.target.value)}
-                    className="mt-1"
-                    placeholder="e.g. 480"
-                  />
+              {isDiskType ? (
+                <>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label>Capacity (GB)</Label>
+                      <Input
+                        type="number"
+                        value={compCapacityGb}
+                        onChange={(e) => setCompCapacityGb(e.target.value)}
+                        className="mt-1"
+                        placeholder="e.g. 480"
+                      />
+                    </div>
+                    <div>
+                      <Label>Serial Number</Label>
+                      <Input
+                        value={compSerialNumber}
+                        onChange={(e) => setCompSerialNumber(e.target.value)}
+                        className="mt-1"
+                        placeholder="e.g. S3Z9..."
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label>Model</Label>
+                      <Input
+                        value={compModel}
+                        onChange={(e) => setCompModel(e.target.value)}
+                        className="mt-1"
+                        placeholder="e.g. Samsung PM893"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label>Volumes (RAID/Partition)</Label>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="!py-1.5 !text-xs"
+                        onClick={() =>
+                          setCompVolumes((prev) => [
+                            ...prev,
+                            { name: `Volume ${prev.length + 1}`, standard_gb: "" },
+                          ])
+                        }
+                      >
+                        + Add volume
+                      </Button>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {compVolumes.length === 0 ? (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Kosongkan jika tidak ada volume/RAID khusus.
+                        </div>
+                      ) : null}
+                      {compVolumes.map((v, idx) => (
+                        <div key={idx} className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+                          <div className="sm:col-span-4">
+                            <Input
+                              value={v.name}
+                              onChange={(e) =>
+                                setCompVolumes((prev) =>
+                                  prev.map((row, i) =>
+                                    i === idx ? { ...row, name: e.target.value } : row,
+                                  ),
+                                )
+                              }
+                              placeholder="Volume 1"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 flex gap-2">
+                            <Input
+                              type="number"
+                              value={v.standard_gb}
+                              onChange={(e) =>
+                                setCompVolumes((prev) =>
+                                  prev.map((row, i) =>
+                                    i === idx
+                                      ? { ...row, standard_gb: e.target.value === "" ? "" : Number(e.target.value) }
+                                      : row,
+                                  ),
+                                )
+                              }
+                              placeholder="Std GB"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              className="!py-2 !text-xs"
+                              onClick={() =>
+                                setCompVolumes((prev) => prev.filter((_, i) => i !== idx))
+                              }
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : isCpuType ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>CPU Code</Label>
+                    <Input
+                      value={compCpuCode}
+                      onChange={(e) => setCompCpuCode(e.target.value)}
+                      className="mt-1"
+                      placeholder="e.g. 0x0B06A3"
+                    />
+                  </div>
+                  <div>
+                    <Label>Serial Number</Label>
+                    <Input
+                      value={compSerialNumber}
+                      onChange={(e) => setCompSerialNumber(e.target.value)}
+                      className="mt-1"
+                      placeholder="Opsional"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Model</Label>
+                    <Input
+                      value={compModel}
+                      onChange={(e) => setCompModel(e.target.value)}
+                      className="mt-1"
+                      placeholder="e.g. Intel Xeon Gold 6230"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>Serial Number</Label>
-                  <Input
-                    value={compSerialNumber}
-                    onChange={(e) => setCompSerialNumber(e.target.value)}
-                    className="mt-1"
-                    placeholder="e.g. S3Z9..."
-                  />
+              ) : isPsuType ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Watt</Label>
+                    <Input
+                      type="number"
+                      value={compPsuWatt}
+                      onChange={(e) => setCompPsuWatt(e.target.value)}
+                      className="mt-1"
+                      placeholder="e.g. 750"
+                    />
+                  </div>
+                  <div>
+                    <Label>Serial Number</Label>
+                    <Input
+                      value={compSerialNumber}
+                      onChange={(e) => setCompSerialNumber(e.target.value)}
+                      className="mt-1"
+                      placeholder="Opsional"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Model</Label>
+                    <Input
+                      value={compModel}
+                      onChange={(e) => setCompModel(e.target.value)}
+                      className="mt-1"
+                      placeholder="e.g. Delta DPS-750..."
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Serial Number</Label>
+                    <Input
+                      value={compSerialNumber}
+                      onChange={(e) => setCompSerialNumber(e.target.value)}
+                      className="mt-1"
+                      placeholder="Opsional"
+                    />
+                  </div>
+                  <div>
+                    <Label>Model</Label>
+                    <Input
+                      value={compModel}
+                      onChange={(e) => setCompModel(e.target.value)}
+                      className="mt-1"
+                      placeholder="Opsional"
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <Label>Specs (JSON) — opsional (dinamis)</Label>
                 <Textarea
