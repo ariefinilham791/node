@@ -14,6 +14,7 @@ import { Input } from "@/components/Input"
 import { Label } from "@/components/Label"
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { RiAddLine, RiEdit2Line, RiShutDownLine } from "@remixicon/react"
 import { toast } from "@/lib/toast"
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client"
@@ -38,9 +39,12 @@ type Server = {
   physical_status: string
   location_name: string
   component_count: number
+  next_schedule_id?: number | null
+  next_due_date?: string | null
 }
 
 export default function ServersPage() {
+  const router = useRouter()
   const [servers, setServers] = useState<Server[]>([])
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<string>("")
@@ -77,7 +81,7 @@ export default function ServersPage() {
   async function load() {
     setLoading(true)
     try {
-      const data = await apiGet<Server[]>("/api/servers")
+      const data = await apiGet<Server[]>("/api/servers?include=next-check")
       setServers(data)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal memuat server")
@@ -99,6 +103,16 @@ export default function ServersPage() {
       .then(setComponentTypes)
       .catch(() => {})
   }, [])
+
+  async function handleCheckNow(serverId: number) {
+    try {
+      const res = await apiPost<{ scheduleId: number }>(`/api/servers/${serverId}/check-now`)
+      if (res?.scheduleId) router.push(`/monitoring/${res.scheduleId}`)
+      else throw new Error("Schedule tidak ditemukan")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal memulai pengecekan")
+    }
+  }
 
   function openAddComponent(server?: Server) {
     setCompServerId(server ? String(server.id) : (servers[0]?.id ? String(servers[0].id) : ""))
@@ -383,6 +397,7 @@ export default function ServersPage() {
                       <TableHeaderCell>Tipe</TableHeaderCell>
                       <TableHeaderCell>Status</TableHeaderCell>
                       <TableHeaderCell>Komponen</TableHeaderCell>
+                      <TableHeaderCell>Pengecekan selanjutnya</TableHeaderCell>
                       {isAdmin && (
                         <TableHeaderCell className="text-right">
                           Action
@@ -416,9 +431,25 @@ export default function ServersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{s.component_count}</TableCell>
+                        <TableCell className="text-gray-900 dark:text-gray-50">
+                          {s.next_due_date
+                            ? new Date(s.next_due_date).toLocaleDateString("id-ID", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </TableCell>
                         {isAdmin && (
                           <TableCell className="text-right">
                             <div className="inline-flex items-center gap-2">
+                              <Button
+                                variant="primary"
+                                className="!py-1.5 !text-xs"
+                                onClick={() => handleCheckNow(s.id)}
+                              >
+                                Cek sekarang
+                              </Button>
                               <Button
                                 variant="secondary"
                                 className="gap-1 !py-1.5 !text-xs"

@@ -84,7 +84,7 @@ export function ReminderPopup() {
         </DialogHeader>
         <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           <p>
-            Weekly monitoring for <strong>{reminder.location_name}</strong> (Week {reminder.week_number}, {reminder.year}) is due on <strong>{dueDateStr}</strong>. {statusLine}.
+            Monthly monitoring for <strong>{reminder.location_name}</strong> is due on <strong>{dueDateStr}</strong>. {statusLine}.
           </p>
         </div>
         <DialogFooter>

@@ -144,6 +144,41 @@ export async function getServersList(): Promise<ServerRow[]> {
   return (rows ?? []) as ServerRow[]
 }
 
+export type ServerNextCheckRow = {
+  next_schedule_id: number | null
+  next_due_date: string | null
+}
+
+export type ServerRowWithNextCheck = ServerRow & ServerNextCheckRow
+
+export async function getServersListWithNextCheck(): Promise<ServerRowWithNextCheck[]> {
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status,
+            l.name AS location_name,
+            COUNT(sc.id) AS component_count,
+            ns.next_schedule_id,
+            ns.next_due_date
+     FROM servers s
+     JOIN locations l ON s.location_id = l.id
+     LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
+     LEFT JOIN (
+        SELECT ms.location_id,
+               MIN(ms.due_date) AS next_due_date,
+               SUBSTRING_INDEX(
+                 GROUP_CONCAT(ms.id ORDER BY ms.due_date ASC, ms.id ASC),
+                 ',', 1
+               ) AS next_schedule_id
+        FROM monitoring_schedules ms
+        WHERE ms.due_date >= CURDATE()
+          AND ms.status <> 'completed'
+        GROUP BY ms.location_id
+     ) ns ON ns.location_id = s.location_id
+     GROUP BY s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
+     ORDER BY l.name, s.sort_order`
+  )
+  return (rows ?? []) as ServerRowWithNextCheck[]
+}
+
 export type ServerWithComponentsRow = ServerRow & {
   components: ServerComponentRow[]
 }
@@ -184,6 +219,42 @@ export async function getServersListWithComponents(): Promise<ServerWithComponen
     ...s,
     components: componentsByServerId.get(s.id) ?? [],
   }))
+}
+
+function toMysqlDate(d: Date): string {
+  // YYYY-MM-DD (MySQL DATE)
+  return d.toISOString().slice(0, 10)
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
+}
+
+function endOfMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0))
+}
+
+export async function getOrCreateMonthlySchedule(locationId: number, now = new Date()): Promise<number> {
+  const start = startOfMonth(now)
+  const end = endOfMonth(now)
+  const year = start.getUTCFullYear()
+  const monthNumber = start.getUTCMonth() + 1
+
+  const [existing] = await pool.execute<RowDataPacket[]>(
+    `SELECT id FROM monitoring_schedules
+     WHERE location_id = ? AND week_start = ? LIMIT 1`,
+    [locationId, toMysqlDate(start)]
+  )
+  const existingId = (existing as RowDataPacket[])?.[0]?.id
+  if (existingId) return Number(existingId)
+
+  const [result] = await pool.execute<ResultSetHeader>(
+    `INSERT INTO monitoring_schedules
+     (location_id, week_number, year, week_start, week_end, due_date, status, assigned_to)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL)`,
+    [locationId, monthNumber, year, toMysqlDate(start), toMysqlDate(end), toMysqlDate(end)]
+  )
+  return result.insertId
 }
 
 export async function createServer(data: {

@@ -16,7 +16,7 @@ import { cx } from "@/lib/utils"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: RiHomeLine },
-  { href: "/monitoring", label: "Weekly Monitoring", icon: RiCalendarLine },
+  { href: "/monitoring", label: "Monthly Monitoring", icon: RiCalendarLine },
   { href: "/servers", label: "Servers", icon: RiServerLine },
   { href: "/export", label: "Export", icon: RiDownloadLine },
 ]

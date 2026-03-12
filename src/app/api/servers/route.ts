@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth"
-import { createServer, getServersList, getServersListWithComponents } from "@/lib/queries"
+import { createServer, getServersList, getServersListWithComponents, getServersListWithNextCheck } from "@/lib/queries"
 import { jsonError, jsonOk, parseJson, zodErrorToMessage } from "@/lib/http"
 import { z } from "zod"
 
@@ -9,9 +9,12 @@ export async function GET(request: Request) {
     if (!session) return jsonError("Unauthorized", 401)
     const { searchParams } = new URL(request.url)
     const includeComponents = searchParams.get("include") === "components"
+    const includeNextCheck = searchParams.get("include") === "next-check"
     const servers = includeComponents
       ? await getServersListWithComponents()
-      : await getServersList()
+      : includeNextCheck
+        ? await getServersListWithNextCheck()
+        : await getServersList()
     return jsonOk(servers)
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Server error"

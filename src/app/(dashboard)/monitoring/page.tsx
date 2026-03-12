@@ -118,10 +118,10 @@ export default function MonitoringPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-            Weekly Monitoring
+            Monthly Monitoring
           </h1>
           <p className="text-gray-500 sm:text-sm/6 dark:text-gray-500">
-            Pilih jadwal untuk mengisi form monitoring mingguan
+            Pilih jadwal untuk mengisi form monitoring bulanan
           </p>
         </div>
       </div>
@@ -253,7 +253,7 @@ export default function MonitoringPage() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell>Week</TableHeaderCell>
+                  <TableHeaderCell>Periode</TableHeaderCell>
                   <TableHeaderCell>Location</TableHeaderCell>
                   <TableHeaderCell>Period</TableHeaderCell>
                   <TableHeaderCell>Due Date</TableHeaderCell>
@@ -276,7 +276,10 @@ export default function MonitoringPage() {
                   schedules.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="text-gray-900 dark:text-gray-50">
-                        Week {s.week_number}, {s.year}
+                        {new Date(s.week_start).toLocaleDateString("id-ID", {
+                          month: "long",
+                          year: "numeric",
+                        })}
                       </TableCell>
                       <TableCell>{s.location_name}</TableCell>
                       <TableCell>
