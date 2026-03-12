@@ -195,6 +195,33 @@ export default function MonitoringFormPage() {
     return snapshots[serverId]
   }
 
+  /** Checklist hijau hanya jika ada data bermakna: status, size/komponen terisi, dll. */
+  function snapshotIsFilled(
+    snap: typeof snapshots[number] | undefined,
+    server: ServerWithComponents
+  ): boolean {
+    if (!snap) return false
+    const mainFilled =
+      (snap.mem_used_pct && String(snap.mem_used_pct).trim() !== "") ||
+      (snap.cpu_load_pct && String(snap.cpu_load_pct).trim() !== "") ||
+      snap.email_pop3 === "UP" ||
+      snap.email_pop3 === "DOWN" ||
+      snap.email_imap === "UP" ||
+      snap.email_imap === "DOWN" ||
+      snap.web_service === "UP" ||
+      snap.web_service === "DOWN" ||
+      (snap.overall_status && snap.overall_status !== "UNKNOWN") ||
+      (snap.remark && String(snap.remark).trim() !== "")
+    if (mainFilled) return true
+    for (const comp of server.components ?? []) {
+      const readings = snap.readings[comp.id] ?? {}
+      for (const v of Object.values(readings)) {
+        if (v != null && String(v).trim() !== "") return true
+      }
+    }
+    return false
+  }
+
   function setServerQuickOk(serverId: number) {
     setSnapshots((prev) => ({
       ...prev,
@@ -405,6 +432,7 @@ export default function MonitoringFormPage() {
               const snap = snapshots[server.id]
               const expanded = expandedServerId === server.id
               const hasData = !!snap
+              const hasFilledData = snapshotIsFilled(snap, server)
               return (
                 <Card key={server.id} className="overflow-hidden p-0">
                   <button
@@ -414,12 +442,12 @@ export default function MonitoringFormPage() {
                   >
                     <div className="flex items-center gap-2">
                       {expanded ? <RiArrowDownSLine className="size-5 shrink-0 text-gray-500" /> : <RiArrowRightSLine className="size-5 shrink-0 text-gray-500" />}
-                      {hasData ? (
+                      {hasFilledData ? (
                         <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
                       ) : null}
                       <span className="font-medium text-gray-900 dark:text-gray-50">{server.hostname}</span>
                       {server.ip_address && <span className="text-sm text-gray-500">{server.ip_address}</span>}
-                      {!hasData && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">Belum diisi</span>}
+                      {!hasFilledData && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">Belum diisi</span>}
                     </div>
                   </button>
                   {expanded && (
@@ -518,7 +546,7 @@ export default function MonitoringFormPage() {
           <Card key={server.id} className="mb-8">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <h3 className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-50">
-                {snapshots[server.id] ? (
+                {snapshotIsFilled(snapshots[server.id], server) ? (
                   <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
                 ) : null}
                 {server.hostname}
