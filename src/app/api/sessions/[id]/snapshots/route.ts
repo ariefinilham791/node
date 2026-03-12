@@ -60,21 +60,21 @@ export async function POST(request: Request, context: Context) {
           snap.mem_used_pct != null ? Number(snap.mem_used_pct) : null,
         cpu_load_pct:
           snap.cpu_load_pct != null ? Number(snap.cpu_load_pct) : null,
-        email_pop3: ["UP", "DOWN", "N/A"].includes(snap.email_pop3)
-          ? snap.email_pop3
+        email_pop3: ["UP", "DOWN", "N/A"].includes(snap.email_pop3 ?? "")
+          ? (snap.email_pop3 ?? "N/A")
           : "N/A",
-        email_imap: ["UP", "DOWN", "N/A"].includes(snap.email_imap)
-          ? snap.email_imap
+        email_imap: ["UP", "DOWN", "N/A"].includes(snap.email_imap ?? "")
+          ? (snap.email_imap ?? "N/A")
           : "N/A",
-        web_service: ["UP", "DOWN", "N/A"].includes(snap.web_service)
-          ? snap.web_service
+        web_service: ["UP", "DOWN", "N/A"].includes(snap.web_service ?? "")
+          ? (snap.web_service ?? "N/A")
           : "N/A",
         av_pattern:
           snap.av_pattern != null ? String(snap.av_pattern) : null,
         overall_status: ["OK", "WARNING", "CRITICAL", "UNKNOWN"].includes(
-          snap.overall_status,
+          snap.overall_status ?? ""
         )
-          ? snap.overall_status
+          ? (snap.overall_status ?? "UNKNOWN")
           : "UNKNOWN",
         remark: snap.remark != null ? String(snap.remark) : null,
       })
