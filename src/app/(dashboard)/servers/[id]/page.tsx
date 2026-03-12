@@ -4,6 +4,7 @@ import { Card } from "@/components/Card"
 import { Button } from "@/components/Button"
 import { Input } from "@/components/Input"
 import { Label } from "@/components/Label"
+import { Textarea } from "@/components/Textarea"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
@@ -108,6 +109,9 @@ export default function ServerDetailPage() {
   const [compLabel, setCompLabel] = useState("")
   const [compSlot, setCompSlot] = useState(0)
   const [compTypeId, setCompTypeId] = useState("")
+  const [compCapacityGb, setCompCapacityGb] = useState("")
+  const [compSerialNumber, setCompSerialNumber] = useState("")
+  const [compSpecsJson, setCompSpecsJson] = useState("")
   const [compSaving, setCompSaving] = useState(false)
   const [role, setRole] = useState<string>("")
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -182,6 +186,9 @@ export default function ServerDetailPage() {
     setCompLabel("")
     setCompSlot(0)
     setCompTypeId("")
+    setCompCapacityGb("")
+    setCompSerialNumber("")
+    setCompSpecsJson("")
     setCompModal(true)
   }
 
@@ -190,6 +197,17 @@ export default function ServerDetailPage() {
     setCompLabel(c.label)
     setCompSlot(c.slot_index)
     setCompTypeId(String(c.component_type_id))
+    const specs =
+      c.specs && typeof c.specs === "object" ? (c.specs as Record<string, unknown>) : {}
+    setCompCapacityGb(
+      specs.capacity_gb != null
+        ? String(specs.capacity_gb)
+        : specs.size_gb != null
+          ? String(specs.size_gb)
+          : "",
+    )
+    setCompSerialNumber(specs.serial_number != null ? String(specs.serial_number) : "")
+    setCompSpecsJson(Object.keys(specs).length ? JSON.stringify(specs, null, 2) : "")
     setCompModal(true)
   }
 
@@ -197,10 +215,32 @@ export default function ServerDetailPage() {
     if (!compLabel.trim()) return
     setCompSaving(true)
     try {
+      let specs: Record<string, unknown> | null = null
+      const trimmedJson = compSpecsJson.trim()
+      if (trimmedJson) {
+        try {
+          const parsed = JSON.parse(trimmedJson) as unknown
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            specs = parsed as Record<string, unknown>
+          } else {
+            throw new Error("Specs JSON harus object")
+          }
+        } catch (e) {
+          throw new Error(
+            e instanceof Error ? `Specs JSON invalid: ${e.message}` : "Specs JSON invalid",
+          )
+        }
+      } else {
+        const next: Record<string, unknown> = {}
+        if (compCapacityGb.trim() !== "") next.capacity_gb = Number(compCapacityGb)
+        if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+        specs = Object.keys(next).length ? next : null
+      }
+
       if (compEdit) {
         await apiPut<{ success: true }>(
           `/api/servers/${serverId}/components/${compEdit.id}`,
-          { label: compLabel.trim(), slot_index: compSlot },
+          { label: compLabel.trim(), slot_index: compSlot, specs },
         )
         toast.success("Komponen berhasil diperbarui")
         load()
@@ -211,6 +251,7 @@ export default function ServerDetailPage() {
           component_type_id: Number(compTypeId),
           label: compLabel.trim(),
           slot_index: compSlot,
+          specs,
         })
         toast.success("Komponen berhasil dibuat")
         load()
@@ -558,6 +599,42 @@ export default function ServerDetailPage() {
                   onChange={(e) => setCompSlot(Number(e.target.value) || 0)}
                   className="mt-1 w-24"
                 />
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-300">
+                Isi <span className="font-medium">Standard</span> di sini (master). Saat monitoring nanti cukup pilih OK/FAIL/N/A dan isi Used (%).
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Capacity (GB)</Label>
+                  <Input
+                    type="number"
+                    value={compCapacityGb}
+                    onChange={(e) => setCompCapacityGb(e.target.value)}
+                    className="mt-1"
+                    placeholder="e.g. 480"
+                  />
+                </div>
+                <div>
+                  <Label>Serial Number</Label>
+                  <Input
+                    value={compSerialNumber}
+                    onChange={(e) => setCompSerialNumber(e.target.value)}
+                    className="mt-1"
+                    placeholder="e.g. S3Z9..."
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Specs (JSON) — opsional (dinamis)</Label>
+                <Textarea
+                  value={compSpecsJson}
+                  onChange={(e) => setCompSpecsJson(e.target.value)}
+                  className="mt-1 font-mono text-xs"
+                  placeholder={`{\n  "capacity_gb": 480,\n  "serial_number": "S3Z9...",\n  "model": "Samsung ..."\n}`}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Kalau diisi, JSON ini akan dipakai sebagai specs dan menimpa input Capacity/Serial di atas.
+                </p>
               </div>
             </div>
             <div className="mt-6 flex gap-2 justify-end">

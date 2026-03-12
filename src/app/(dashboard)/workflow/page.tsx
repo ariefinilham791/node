@@ -7,20 +7,37 @@ import { Label } from "@/components/Label"
 import { ProgressCircle } from "@/components/ProgressCircle"
 import { Slider } from "@/components/Slider"
 import { departments } from "@/data/workflow/schema"
-import { workflowStats } from "@/data/workflow/workflow-data"
+import type { WorkflowStats } from "@/data/workflow/schema"
+import { apiGet } from "@/lib/api-client"
 import { valueFormatter } from "@/lib/formatters"
 import { RiResetLeftLine } from "@remixicon/react"
 import React from "react"
 
 export default function Workflow() {
-  const data = React.useMemo(() => workflowStats, [])
+  const [data, setData] = React.useState<WorkflowStats[]>([])
+
+  React.useEffect(() => {
+    let cancelled = false
+    apiGet<WorkflowStats[]>("/api/overview/workflow")
+      .then((rows) => {
+        if (cancelled) return
+        setData(rows ?? [])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setData([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [excludedDepartments, setExcludedDepartments] = React.useState<
     Set<string>
   >(new Set())
 
   const aggregateStats = React.useMemo(() => {
-    const selectedStats = data[0].department_stats.filter(
+    const selectedStats = (data[0]?.department_stats ?? []).filter(
       (dept) => !excludedDepartments.has(dept.department),
     )
 
@@ -184,6 +201,11 @@ export default function Workflow() {
         </div>
       </div>
       <Divider />
+      {data.length === 0 ? (
+        <div className="mt-8 text-sm text-gray-500 dark:text-gray-500">
+          Loading workflow data…
+        </div>
+      ) : null}
       <div className="mt-8 flex w-full flex-wrap items-start gap-6 rounded-lg bg-gray-50/50 p-6 ring-1 ring-gray-200 dark:bg-[#090E1A] dark:ring-gray-800">
         <div className="w-full sm:w-96">
           <Label
@@ -240,7 +262,7 @@ export default function Workflow() {
             Select department to exclude
           </legend>
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {data[0].department_stats.map((dept) => (
+            {(data[0]?.department_stats ?? []).map((dept) => (
               <div key={dept.department} className="flex items-center gap-2.5">
                 <CheckboxExclude
                   id={dept.department}

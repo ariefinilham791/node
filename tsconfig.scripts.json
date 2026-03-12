@@ -8,6 +8,6 @@
     "esModuleInterop": true,
     "isolatedModules": false
   },
-  "include": ["src/data"],
+  "include": ["src/data", "scripts"],
   "exclude": ["node_modules"]
 }

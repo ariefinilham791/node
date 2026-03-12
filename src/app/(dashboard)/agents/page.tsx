@@ -1,9 +1,31 @@
+"use client"
+
 import { Divider } from "@/components/Divider"
 import { columns } from "@/components/ui/data-table/columns"
 import { DataTable } from "@/components/ui/data-table/DataTable"
-import { agents } from "@/data/agents/agents"
+import type { Agent } from "@/data/agents/schema"
+import { apiGet } from "@/lib/api-client"
+import React from "react"
 
 export default function Agents() {
+  const [agents, setAgents] = React.useState<Agent[]>([])
+
+  React.useEffect(() => {
+    let cancelled = false
+    apiGet<Agent[]>("/api/overview/agents")
+      .then((rows) => {
+        if (cancelled) return
+        setAgents(rows ?? [])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setAgents([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <main>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

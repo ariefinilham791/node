@@ -24,6 +24,8 @@ type ServerWithComponents = {
     slot_index: number
     type_name: string
     metric_schema: unknown
+    specs?: Record<string, unknown> | null
+    unit_label?: string | null
   }[]
 }
 
@@ -33,6 +35,41 @@ function parseMetricSchema(schema: unknown): MetricField[] {
     (f): f is MetricField =>
       f && typeof f === "object" && "key" in f && typeof (f as MetricField).key === "string"
   ) as MetricField[]
+}
+
+function formatStandard(specs: Record<string, unknown> | null | undefined): string {
+  if (!specs) return "—"
+  const entries = Object.entries(specs).filter(
+    ([, v]) => v != null && String(v).trim() !== "",
+  )
+  if (entries.length === 0) return "—"
+  // Prefer common keys first
+  const preferred = [
+    "capacity_gb",
+    "size_gb",
+    "capacity",
+    "size",
+    "serial_number",
+    "model",
+    "standard",
+    "max",
+    "limit",
+  ]
+  const sorted = [
+    ...entries.filter(([k]) => preferred.includes(String(k).toLowerCase())),
+    ...entries.filter(([k]) => !preferred.includes(String(k).toLowerCase())),
+  ]
+  const top = sorted.slice(0, 3).map(([k, v]) => `${k}: ${String(v)}`)
+  return top.join(" • ")
+}
+
+function getUsedFieldMeta(comp: ServerWithComponents["components"][number]) {
+  const fields = parseMetricSchema(comp.metric_schema)
+  const firstNumber = fields.find((f) => f.input_type === "number") ?? fields[0]
+  return {
+    label: firstNumber?.label ?? "Used",
+    unit: comp.unit_label ?? firstNumber?.unit ?? "",
+  }
 }
 
 function ChoiceButtons({
@@ -152,7 +189,7 @@ export default function MonitoringFormPage() {
                 s.cpu_load_pct != null ? String(s.cpu_load_pct) : "",
               email_pop3: s.email_pop3 ?? "N/A",
               email_imap: s.email_imap ?? "N/A",
-              web_service: s.web_service ?? "N/A",
+              web_service: s.web_service ?? "UP",
               overall_status: s.overall_status ?? "UNKNOWN",
               remark: s.remark ?? "",
               readings: s.readings ?? {},
@@ -175,7 +212,7 @@ export default function MonitoringFormPage() {
           cpu_load_pct: "",
           email_pop3: "N/A",
           email_imap: "N/A",
-          web_service: "N/A",
+          web_service: "UP",
           overall_status: "UNKNOWN",
           remark: "",
           readings: {},
@@ -186,7 +223,7 @@ export default function MonitoringFormPage() {
         cpu_load_pct: "",
         email_pop3: "N/A",
         email_imap: "N/A",
-        web_service: "N/A",
+        web_service: "UP",
         overall_status: "UNKNOWN",
         remark: "",
         readings: {},
@@ -201,18 +238,6 @@ export default function MonitoringFormPage() {
     server: ServerWithComponents
   ): boolean {
     if (!snap) return false
-    const mainFilled =
-      (snap.mem_used_pct && String(snap.mem_used_pct).trim() !== "") ||
-      (snap.cpu_load_pct && String(snap.cpu_load_pct).trim() !== "") ||
-      snap.email_pop3 === "UP" ||
-      snap.email_pop3 === "DOWN" ||
-      snap.email_imap === "UP" ||
-      snap.email_imap === "DOWN" ||
-      snap.web_service === "UP" ||
-      snap.web_service === "DOWN" ||
-      (snap.overall_status && snap.overall_status !== "UNKNOWN") ||
-      (snap.remark && String(snap.remark).trim() !== "")
-    if (mainFilled) return true
     for (const comp of server.components ?? []) {
       const readings = snap.readings[comp.id] ?? {}
       for (const v of Object.values(readings)) {
@@ -227,10 +252,6 @@ export default function MonitoringFormPage() {
       ...prev,
       [serverId]: {
         ...getOrInitSnapshot(serverId),
-        email_pop3: "UP",
-        email_imap: "UP",
-        web_service: "UP",
-        overall_status: "OK",
       },
     }))
   }
@@ -254,13 +275,15 @@ export default function MonitoringFormPage() {
         const snap = getOrInitSnapshot(s.id)
         return {
           server_id: s.id,
-          mem_used_pct: snap.mem_used_pct || null,
-          cpu_load_pct: snap.cpu_load_pct || null,
-          email_pop3: snap.email_pop3,
-          email_imap: snap.email_imap,
-          web_service: snap.web_service,
-          overall_status: snap.overall_status,
-          remark: snap.remark || null,
+          // Server-level fields intentionally omitted from UI (checklist-only UX).
+          // Keep sending defaults to preserve existing DB columns & exports.
+          mem_used_pct: null,
+          cpu_load_pct: null,
+          email_pop3: "N/A",
+          email_imap: "N/A",
+          web_service: "N/A",
+          overall_status: "UNKNOWN",
+          remark: null,
           readings: s.components.map((c) => ({
             server_component_id: c.id,
             metrics: snap.readings[c.id] ?? {},
@@ -452,33 +475,39 @@ export default function MonitoringFormPage() {
                   </button>
                   {expanded && (
                     <div className="border-t border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
-                      {hasData && snap ? (
-                        <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                          <div><dt className="text-gray-500 dark:text-gray-400">Memory used (%)</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.mem_used_pct || "—"}</dd></div>
-                          <div><dt className="text-gray-500 dark:text-gray-400">CPU load (%)</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.cpu_load_pct || "—"}</dd></div>
-                          <div><dt className="text-gray-500 dark:text-gray-400">Email POP3 / IMAP / Web</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.email_pop3} / {snap.email_imap} / {snap.web_service}</dd></div>
-                          <div><dt className="text-gray-500 dark:text-gray-400">Overall status</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.overall_status}</dd></div>
-                          {snap.remark && <div className="sm:col-span-2 lg:col-span-4"><dt className="text-gray-500 dark:text-gray-400">Remark</dt><dd className="font-medium text-gray-900 dark:text-gray-50">{snap.remark}</dd></div>}
-                        </dl>
-                      ) : null}
                       {hasData && server.components?.length > 0 && snap && (
                         <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
                           <h4 className="mb-2 text-xs font-medium uppercase tracking text-gray-500 dark:text-gray-400">Komponen</h4>
                           <div className="space-y-3">
                             {server.components.map((comp) => {
-                              const fields = parseMetricSchema(comp.metric_schema)
+                              const meta = getUsedFieldMeta(comp)
                               const compReadings = snap.readings[comp.id] ?? {}
-                              if (fields.length === 0) return null
+                              const used = compReadings.used ?? ""
+                              const status = compReadings.status ?? ""
                               return (
                                 <div key={comp.id} className="rounded border border-gray-200 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-900/50">
                                   <p className="mb-1 font-medium text-gray-800 dark:text-gray-200">{comp.label} ({comp.type_name})</p>
-                                  <dl className="grid gap-1 sm:grid-cols-2">
-                                    {fields.map((field) => (
-                                      <div key={field.key}>
-                                        <dt className="text-gray-500 dark:text-gray-400">{field.label}{field.unit ? ` (${field.unit})` : ""}</dt>
-                                        <dd className="text-gray-900 dark:text-gray-50">{compReadings[field.key] ?? "—"}</dd>
-                                      </div>
-                                    ))}
+                                  <dl className="grid gap-1 sm:grid-cols-3">
+                                    <div>
+                                      <dt className="text-gray-500 dark:text-gray-400">Standard</dt>
+                                      <dd className="text-gray-900 dark:text-gray-50">
+                                        {formatStandard(comp.specs)}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-gray-500 dark:text-gray-400">
+                                        Used{meta.unit ? ` (${meta.unit})` : ""}
+                                      </dt>
+                                      <dd className="text-gray-900 dark:text-gray-50">
+                                        {used || "—"}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-gray-500 dark:text-gray-400">Checklist</dt>
+                                      <dd className="text-gray-900 dark:text-gray-50">
+                                        {status || "—"}
+                                      </dd>
+                                    </div>
                                   </dl>
                                 </div>
                               )
@@ -567,132 +596,6 @@ export default function MonitoringFormPage() {
                 </Button>
               </div>
             </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <Label>Memory used (%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={snap.mem_used_pct}
-                  onChange={(e) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: {
-                        ...getOrInitSnapshot(server.id),
-                        mem_used_pct: e.target.value,
-                      },
-                    }))
-                  }
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>CPU load (%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={snap.cpu_load_pct}
-                  onChange={(e) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: {
-                        ...getOrInitSnapshot(server.id),
-                        cpu_load_pct: e.target.value,
-                      },
-                    }))
-                  }
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Email POP3</Label>
-                <ChoiceButtons
-                  value={snap.email_pop3}
-                  onChange={(v) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: { ...getOrInitSnapshot(server.id), email_pop3: v },
-                    }))
-                  }
-                  options={[
-                    { value: "UP", label: "UP", variant: "primary" },
-                    { value: "DOWN", label: "DOWN", variant: "destructive" },
-                    { value: "N/A", label: "N/A", variant: "light" },
-                  ]}
-                />
-              </div>
-              <div>
-                <Label>Email IMAP</Label>
-                <ChoiceButtons
-                  value={snap.email_imap}
-                  onChange={(v) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: { ...getOrInitSnapshot(server.id), email_imap: v },
-                    }))
-                  }
-                  options={[
-                    { value: "UP", label: "UP", variant: "primary" },
-                    { value: "DOWN", label: "DOWN", variant: "destructive" },
-                    { value: "N/A", label: "N/A", variant: "light" },
-                  ]}
-                />
-              </div>
-              <div>
-                <Label>Web service</Label>
-                <ChoiceButtons
-                  value={snap.web_service}
-                  onChange={(v) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: { ...getOrInitSnapshot(server.id), web_service: v },
-                    }))
-                  }
-                  options={[
-                    { value: "UP", label: "UP", variant: "primary" },
-                    { value: "DOWN", label: "DOWN", variant: "destructive" },
-                    { value: "N/A", label: "N/A", variant: "light" },
-                  ]}
-                />
-              </div>
-              <div>
-                <Label>Overall status</Label>
-                <ChoiceButtons
-                  value={snap.overall_status}
-                  onChange={(v) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: { ...getOrInitSnapshot(server.id), overall_status: v },
-                    }))
-                  }
-                  options={[
-                    { value: "OK", label: "OK", variant: "primary" },
-                    { value: "WARNING", label: "WARNING", variant: "warning" },
-                    { value: "CRITICAL", label: "CRITICAL", variant: "destructive" },
-                    { value: "UNKNOWN", label: "UNKNOWN", variant: "secondary" },
-                  ]}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Label>Remark</Label>
-                <Input
-                  value={snap.remark}
-                  onChange={(e) =>
-                    setSnapshots((prev) => ({
-                      ...prev,
-                      [server.id]: {
-                        ...getOrInitSnapshot(server.id),
-                        remark: e.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="Catatan"
-                  className="mt-1"
-                />
-              </div>
-            </div>
             {/* Dynamic fields from metric_schema per component */}
             {server.components?.length > 0 && (
               <div className="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
@@ -701,9 +604,8 @@ export default function MonitoringFormPage() {
                 </h4>
                 <div className="space-y-4">
                   {server.components.map((comp) => {
-                    const fields = parseMetricSchema(comp.metric_schema)
-                    if (fields.length === 0) return null
                     const compReadings = snap.readings[comp.id] ?? {}
+                    const meta = getUsedFieldMeta(comp)
                     return (
                       <div
                         key={comp.id}
@@ -713,103 +615,63 @@ export default function MonitoringFormPage() {
                           {comp.label} ({comp.type_name})
                         </p>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          {fields.map((field) => {
-                            const value = compReadings[field.key] ?? ""
-                            const label = field.unit ? `${field.label} (${field.unit})` : field.label
-                            if (field.input_type === "select" && field.options?.length) {
-                              const useButtons = field.options.length <= 4
-                              return (
-                                <div key={field.key}>
-                                  <Label>
-                                    {label}
-                                    {field.required ? <span className="ml-1 text-red-500">*</span> : null}
-                                  </Label>
-                                  {useButtons ? (
-                                    <ChoiceButtons
-                                      value={value}
-                                      onChange={(v) =>
-                                        setSnapshots((prev) => ({
-                                          ...prev,
-                                          [server.id]: {
-                                            ...getOrInitSnapshot(server.id),
-                                            readings: {
-                                              ...getOrInitSnapshot(server.id).readings,
-                                              [comp.id]: {
-                                                ...compReadings,
-                                                [field.key]: v,
-                                              },
-                                            },
-                                          },
-                                        }))
-                                      }
-                                      options={field.options.map((opt) => ({
-                                        value: opt,
-                                        label: opt,
-                                        variant: "light",
-                                      }))}
-                                    />
-                                  ) : (
-                                    <select
-                                      className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
-                                      value={value}
-                                      onChange={(e) =>
-                                        setSnapshots((prev) => ({
-                                          ...prev,
-                                          [server.id]: {
-                                            ...getOrInitSnapshot(server.id),
-                                            readings: {
-                                              ...getOrInitSnapshot(server.id).readings,
-                                              [comp.id]: {
-                                                ...compReadings,
-                                                [field.key]: e.target.value,
-                                              },
-                                            },
-                                          },
-                                        }))
-                                      }
-                                    >
-                                      <option value="">—</option>
-                                      {field.options.map((opt) => (
-                                        <option key={opt} value={opt}>
-                                          {opt}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </div>
-                              )
-                            }
-                            return (
-                              <div key={field.key}>
-                                <Label>
-                                  {label}
-                                  {field.required ? <span className="ml-1 text-red-500">*</span> : null}
-                                </Label>
-                                <Input
-                                  type="number"
-                                  min={field.min}
-                                  max={field.max}
-                                  value={value}
-                                  onChange={(e) =>
-                                    setSnapshots((prev) => ({
-                                      ...prev,
-                                      [server.id]: {
-                                        ...getOrInitSnapshot(server.id),
-                                        readings: {
-                                          ...getOrInitSnapshot(server.id).readings,
-                                          [comp.id]: {
-                                            ...compReadings,
-                                            [field.key]: e.target.value,
-                                          },
-                                        },
+                          <div>
+                            <Label>Standard</Label>
+                            <div className="mt-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
+                              {formatStandard(comp.specs)}
+                            </div>
+                          </div>
+                          <div>
+                            <Label>
+                              Used{meta.unit ? ` (${meta.unit})` : ""}
+                            </Label>
+                            <Input
+                              type="number"
+                              value={compReadings.used ?? ""}
+                              onChange={(e) =>
+                                setSnapshots((prev) => ({
+                                  ...prev,
+                                  [server.id]: {
+                                    ...getOrInitSnapshot(server.id),
+                                    readings: {
+                                      ...getOrInitSnapshot(server.id).readings,
+                                      [comp.id]: {
+                                        ...compReadings,
+                                        used: e.target.value,
                                       },
-                                    }))
-                                  }
-                                  className="mt-1"
-                                />
-                              </div>
-                            )
-                          })}
+                                    },
+                                  },
+                                }))
+                              }
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label>Checklist</Label>
+                            <ChoiceButtons
+                              value={compReadings.status ?? ""}
+                              onChange={(v) =>
+                                setSnapshots((prev) => ({
+                                  ...prev,
+                                  [server.id]: {
+                                    ...getOrInitSnapshot(server.id),
+                                    readings: {
+                                      ...getOrInitSnapshot(server.id).readings,
+                                      [comp.id]: {
+                                        ...compReadings,
+                                        status: v,
+                                      },
+                                    },
+                                  },
+                                }))
+                              }
+                              options={[
+                                { value: "OK", label: "OK", variant: "primary" },
+                                { value: "ERROR", label: "ERROR", variant: "destructive" },
+                                { value: "N/A", label: "N/A", variant: "light" },
+                              ]}
+                            />
+                          </div>
                         </div>
                       </div>
                     )

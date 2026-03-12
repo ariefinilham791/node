@@ -9,13 +9,41 @@ import { ProgressCircle } from "@/components/ProgressCircle"
 import { TicketDrawer } from "@/components/ui/TicketDrawer"
 import { DataTable } from "@/components/ui/data-table-support/DataTable"
 import { columns } from "@/components/ui/data-table-support/columns"
-import { tickets } from "@/data/support/tickets"
-import { volume } from "@/data/support/volume"
+import type { Ticket } from "@/data/support/schema"
+import { apiGet } from "@/lib/api-client"
 import { RiAddLine } from "@remixicon/react"
 import React from "react"
 
 export default function SupportDashboard() {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [tickets, setTickets] = React.useState<Ticket[]>([])
+  const [volume, setVolume] = React.useState<
+    { time: string; Today: number; Yesterday: number }[]
+  >([])
+
+  React.useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      apiGet<Ticket[]>("/api/overview/support/tickets"),
+      apiGet<{ time: string; Today: number; Yesterday: number }[]>(
+        "/api/overview/support/volume",
+      ),
+    ])
+      .then(([t, v]) => {
+        if (cancelled) return
+        setTickets(t ?? [])
+        setVolume(v ?? [])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setTickets([])
+        setVolume([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <main>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

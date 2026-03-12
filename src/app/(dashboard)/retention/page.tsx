@@ -21,8 +21,6 @@ import {
   TableRoot,
   TableRow,
 } from "@/components/Table"
-import { cohorts } from "@/data/retention/cohorts"
-import { cohortsAggregate } from "@/data/retention/cohortsAggregate"
 import {
   ActivitySummary,
   ChannelDistribution,
@@ -31,11 +29,13 @@ import {
   PerformanceMetrics,
   SatisfactionMetrics,
   TopIssue,
+  type CohortsAggregate,
 } from "@/data/retention/schema"
+import { apiGet } from "@/lib/api-client"
 import { valueFormatter } from "@/lib/formatters"
 import { cx, focusRing } from "@/lib/utils"
 import { RiCloseLine, RiExpandDiagonalLine } from "@remixicon/react"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 const colorClasses = [
   "bg-blue-50 dark:bg-blue-950",
@@ -261,9 +261,39 @@ export default function CohortRetention() {
     null,
   )
 
-  const cohortEntries = Object.entries(cohorts as CohortRetentionData)
-  const weeksCount = cohortEntries[0]?.[1].weeks.length ?? 0
-  const weeks = Array.from({ length: weeksCount }, (_, i) => i)
+  const [cohorts, setCohorts] = useState<CohortRetentionData>({})
+  const [cohortsAggregate, setCohortsAggregate] = useState<CohortsAggregate | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      apiGet<CohortRetentionData>("/api/overview/retention/cohorts"),
+      apiGet<CohortsAggregate | null>("/api/overview/retention/aggregate"),
+    ])
+      .then(([c, a]) => {
+        if (cancelled) return
+        setCohorts(c ?? {})
+        setCohortsAggregate(a ?? null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setCohorts({})
+        setCohortsAggregate(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const cohortEntries = useMemo(
+    () => Object.entries(cohorts as CohortRetentionData),
+    [cohorts],
+  )
+  const weeksCount = cohortEntries[0]?.[1]?.weeks.length ?? 0
+  const weeks = useMemo(
+    () => Array.from({ length: weeksCount }, (_, i) => i),
+    [weeksCount],
+  )
 
   return (
     <main>
@@ -279,6 +309,11 @@ export default function CohortRetention() {
         </div>
       </div>
       <Divider />
+      {cohortEntries.length === 0 || !cohortsAggregate ? (
+        <div className="mt-8 text-sm text-gray-500 dark:text-gray-500">
+          Loading retention data…
+        </div>
+      ) : null}
       <section className="mt-8">
         <TableRoot className="overflow-scroll">
           <Table className="border-none">
@@ -396,7 +431,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.totalUsers.toLocaleString()}
+                      {(cohortsAggregate?.totalUsers ?? 0).toLocaleString()}
                     </span>
                     <span className="ml-2 text-sm text-emerald-600 dark:text-emerald-500">
                       +17%
@@ -409,7 +444,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.aggregateMetrics.satisfaction.avgCsatScore.toFixed(
+                      {(cohortsAggregate?.aggregateMetrics.satisfaction.avgCsatScore ?? 0).toFixed(
                         1,
                       )}
                     </span>
@@ -424,7 +459,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.aggregateMetrics.performance.avgResponseTimeMinutes.toFixed(
+                      {(cohortsAggregate?.aggregateMetrics.performance.avgResponseTimeMinutes ?? 0).toFixed(
                         1,
                       )}
                       m
@@ -444,7 +479,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.aggregateMetrics.activity.totalTicketsCreated.toLocaleString()}
+                      {(cohortsAggregate?.aggregateMetrics.activity.totalTicketsCreated ?? 0).toLocaleString()}
                     </span>
                     <span className="ml-2 text-sm text-emerald-600 dark:text-emerald-500">
                       +11%
@@ -458,8 +493,8 @@ export default function CohortRetention() {
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
                       {(
-                        cohortsAggregate.aggregateMetrics.activity
-                          .ticketResolutionRate * 100
+                        (cohortsAggregate?.aggregateMetrics.activity.ticketResolutionRate ?? 0) *
+                        100
                       ).toFixed(1)}
                       %
                     </span>
@@ -474,7 +509,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.totalCohorts}
+                      {cohortsAggregate?.totalCohorts ?? 0}
                     </span>
                     <span className="ml-2 text-sm text-emerald-600 dark:text-emerald-500">
                       +5%
@@ -490,7 +525,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.aggregateMetrics.performance.avgHandlingTimeMinutes.toFixed(
+                      {(cohortsAggregate?.aggregateMetrics.performance.avgHandlingTimeMinutes ?? 0).toFixed(
                         1,
                       )}
                       m
@@ -507,8 +542,8 @@ export default function CohortRetention() {
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
                       {(
-                        cohortsAggregate.aggregateMetrics.performance
-                          .avgFirstContactResolutionRate * 100
+                        (cohortsAggregate?.aggregateMetrics.performance.avgFirstContactResolutionRate ?? 0) *
+                        100
                       ).toFixed(1)}
                       %
                     </span>
@@ -523,7 +558,7 @@ export default function CohortRetention() {
                   </dt>
                   <dd className="mt-1 flex items-baseline">
                     <span className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
-                      {cohortsAggregate.aggregateMetrics.retention.overallRetentionRate.toFixed(
+                      {(cohortsAggregate?.aggregateMetrics.retention.overallRetentionRate ?? 0).toFixed(
                         1,
                       )}
                       %
@@ -542,11 +577,11 @@ export default function CohortRetention() {
               Top Issues
             </p>
             <ol className="mt-4 divide-y divide-gray-200 dark:divide-gray-800">
-              {cohortsAggregate.commonIssues
+              {(cohortsAggregate?.commonIssues ?? [])
                 .sort((a, b) => b.totalCount - a.totalCount)
                 .slice(0, 6)
                 .map((issue, index) => {
-                  const totalCount = cohortsAggregate.commonIssues.reduce(
+                  const totalCount = (cohortsAggregate?.commonIssues ?? []).reduce(
                     (sum, issue) => sum + issue.totalCount,
                     0,
                   )
