@@ -116,6 +116,7 @@ export default function ServerDetailPage() {
   const [compModel, setCompModel] = useState("")
   const [compCpuCode, setCompCpuCode] = useState("")
   const [compPsuWatt, setCompPsuWatt] = useState("")
+  const [compTotalRamGb, setCompTotalRamGb] = useState("")
   const [compVolumes, setCompVolumes] = useState<DiskVolumeSpec[]>([])
   const [compSpecsJson, setCompSpecsJson] = useState("")
   const [compSaving, setCompSaving] = useState(false)
@@ -204,6 +205,7 @@ export default function ServerDetailPage() {
     setCompModel("")
     setCompCpuCode("")
     setCompPsuWatt("")
+    setCompTotalRamGb("")
     setCompVolumes([])
     setCompSpecsJson("")
     setCompModal(true)
@@ -244,6 +246,7 @@ export default function ServerDetailPage() {
     setCompModel(specs.model != null ? String(specs.model) : "")
     setCompCpuCode(specs.cpu_code != null ? String(specs.cpu_code) : "")
     setCompPsuWatt(specs.watt != null ? String(specs.watt) : "")
+    setCompTotalRamGb(specs.total_ram_gb != null ? String(specs.total_ram_gb) : "")
     setCompVolumes(normalizeVolumes(specs.volumes))
     setCompSpecsJson(Object.keys(specs).length ? JSON.stringify(specs, null, 2) : "")
     setCompModal(true)
@@ -261,6 +264,7 @@ export default function ServerDetailPage() {
   const isDiskType = selectedTypeKey.includes("disk") || selectedTypeKey.includes("storage")
   const isCpuType = selectedTypeKey.includes("cpu") || selectedTypeKey.includes("processor")
   const isPsuType = selectedTypeKey.includes("psu") || selectedTypeKey.includes("power")
+  const isRamType = selectedTypeKey.includes("ram") || selectedTypeKey.includes("memory")
 
   async function handleSaveComponent() {
     if (!compLabel.trim()) return
@@ -303,6 +307,10 @@ export default function ServerDetailPage() {
           if (compPsuWatt.trim() !== "") next.watt = Number(compPsuWatt)
           if (compModel.trim() !== "") next.model = compModel.trim()
           if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+        } else if (isRamType) {
+          if (compTotalRamGb.trim() !== "") next.total_ram_gb = Number(compTotalRamGb)
+          if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
+          if (compModel.trim() !== "") next.model = compModel.trim()
         } else {
           if (compSerialNumber.trim() !== "") next.serial_number = compSerialNumber.trim()
           if (compModel.trim() !== "") next.model = compModel.trim()
@@ -835,6 +843,37 @@ export default function ServerDetailPage() {
                       onChange={(e) => setCompModel(e.target.value)}
                       className="mt-1"
                       placeholder="e.g. Delta DPS-750..."
+                    />
+                  </div>
+                </div>
+              ) : isRamType ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Total RAM (GB)</Label>
+                    <Input
+                      type="number"
+                      value={compTotalRamGb}
+                      onChange={(e) => setCompTotalRamGb(e.target.value)}
+                      className="mt-1"
+                      placeholder="e.g. 64"
+                    />
+                  </div>
+                  <div>
+                    <Label>Serial Number</Label>
+                    <Input
+                      value={compSerialNumber}
+                      onChange={(e) => setCompSerialNumber(e.target.value)}
+                      className="mt-1"
+                      placeholder="Opsional"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Model</Label>
+                    <Input
+                      value={compModel}
+                      onChange={(e) => setCompModel(e.target.value)}
+                      className="mt-1"
+                      placeholder="e.g. DDR4 3200..."
                     />
                   </div>
                 </div>

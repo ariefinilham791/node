@@ -49,6 +49,7 @@ function formatStandard(specs: Record<string, unknown> | null | undefined): stri
     "size_gb",
     "capacity",
     "size",
+    "total_ram_gb",
     "serial_number",
     "model",
     "standard",
@@ -707,153 +708,132 @@ export default function MonitoringFormPage() {
                         <p className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200">
                           {comp.label} ({comp.type_name})
                         </p>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          <div>
-                            <Label>Standard</Label>
-                            <div className="mt-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
+                        <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-3">
+                          <div className="lg:col-span-1">
+                            <Label className="text-gray-600 dark:text-gray-400">Standard</Label>
+                            <div className="mt-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
                               {formatStandard(comp.specs)}
                             </div>
                           </div>
 
                           {volumes.length > 0 ? (
-                            <div className="sm:col-span-2 lg:col-span-2">
-                              <Label>Disk (summary)</Label>
-                              <div className="mt-2 space-y-3">
-                                {(() => {
-                                  const readingAny = compReadings as unknown as Record<string, unknown>
-                                  const volMetricsRaw = readingAny.volumes
-                                  const volMetrics: Record<string, unknown> =
-                                    volMetricsRaw &&
-                                    typeof volMetricsRaw === "object" &&
-                                    !Array.isArray(volMetricsRaw)
-                                      ? (volMetricsRaw as Record<string, unknown>)
-                                      : {}
-                                  const { usedSummary, statusSummary } = computeDiskUsedSummary(volumes, volMetrics)
-                                  const usedText = usedSummary == null ? null : `${usedSummary.toFixed(1)}%`
-                                  return (
-                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
-                                      <div className="flex items-center gap-2">
+                            <div className="lg:col-span-2 space-y-4">
+                              {(() => {
+                                const readingAny = compReadings as unknown as Record<string, unknown>
+                                const volMetricsRaw = readingAny.volumes
+                                const volMetrics: Record<string, unknown> =
+                                  volMetricsRaw &&
+                                  typeof volMetricsRaw === "object" &&
+                                  !Array.isArray(volMetricsRaw)
+                                    ? (volMetricsRaw as Record<string, unknown>)
+                                    : {}
+                                const { usedSummary, statusSummary } = computeDiskUsedSummary(volumes, volMetrics)
+                                const usedText = usedSummary == null ? null : `${usedSummary.toFixed(1)}%`
+                                return (
+                                  <>
+                                    <div>
+                                      <Label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        Ringkasan disk
+                                      </Label>
+                                      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-950">
                                         <span
-                                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusPillClasses(
+                                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusPillClasses(
                                             statusSummary || "",
                                           )}`}
                                         >
                                           {statusSummary || "—"}
                                         </span>
                                         {usedText ? (
-                                          <span className="text-xs text-gray-600 dark:text-gray-400">
-                                            Used: <span className="font-medium text-gray-900 dark:text-gray-50">{usedText}</span>
+                                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                                            Used <span className="font-medium text-gray-900 dark:text-gray-50">{usedText}</span>
                                           </span>
                                         ) : null}
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                          {volumes.length} volume{volumes.length > 1 ? "s" : ""}
+                                        </span>
                                       </div>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {volumes.length} volume
-                                        {volumes.length > 1 ? "s" : ""}
-                                      </span>
                                     </div>
-                                  )
-                                })()}
-                                <div className="pt-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Volumes
-                                </div>
-                                {volumes.map((v) => {
-                                  const readingAny = compReadings as unknown as Record<
-                                    string,
-                                    unknown
-                                  >
-                                  const volMetricsRaw = readingAny.volumes
-                                  const volMetrics: Record<string, unknown> =
-                                    volMetricsRaw &&
-                                    typeof volMetricsRaw === "object" &&
-                                    !Array.isArray(volMetricsRaw)
-                                      ? (volMetricsRaw as Record<string, unknown>)
-                                      : {}
-                                  const row =
-                                    (volMetrics[v.name] as Record<string, unknown> | undefined) ??
-                                    {}
-                                  const used = row.used ?? ""
-                                  const status = row.status ?? ""
-                                  return (
-                                    <div
-                                      key={v.name}
-                                      className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-950"
-                                    >
-                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="min-w-0">
-                                          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-50">
-                                            {v.name}
-                                          </div>
-                                          {v.standard_gb != null ? (
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                                              Standard: {v.standard_gb} GB
+                                    <div>
+                                      <Label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        Per volume
+                                      </Label>
+                                      <div className="space-y-2">
+                                        {volumes.map((v) => {
+                                          const row =
+                                            (volMetrics[v.name] as Record<string, unknown> | undefined) ?? {}
+                                          const used = row.used ?? ""
+                                          const status = row.status ?? ""
+                                          return (
+                                            <div
+                                              key={v.name}
+                                              className="grid grid-cols-1 gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center dark:border-gray-700 dark:bg-gray-950"
+                                            >
+                                              <div className="min-w-0">
+                                                <span className="text-sm font-medium text-gray-900 dark:text-gray-50">
+                                                  {v.name}
+                                                </span>
+                                                {v.standard_gb != null ? (
+                                                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                                                    {v.standard_gb} GB
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              <Input
+                                                type="number"
+                                                value={typeof used === "string" || typeof used === "number" ? String(used) : ""}
+                                                onChange={(e) => {
+                                                  const nextVols: Record<string, unknown> = { ...(volMetrics as Record<string, unknown>) }
+                                                  nextVols[v.name] = {
+                                                    ...(nextVols[v.name] as Record<string, unknown> | undefined),
+                                                    used: e.target.value,
+                                                  }
+                                                  setSnapshots((prev) => ({
+                                                    ...prev,
+                                                    [server.id]: {
+                                                      ...getOrInitSnapshot(server.id),
+                                                      readings: {
+                                                        ...getOrInitSnapshot(server.id).readings,
+                                                        [comp.id]: { ...compReadings, volumes: nextVols },
+                                                      },
+                                                    },
+                                                  }))
+                                                }}
+                                                className="w-20 sm:w-24"
+                                                placeholder="Used %"
+                                              />
+                                              <ChoiceButtons
+                                                value={typeof status === "string" ? status : ""}
+                                                onChange={(val) => {
+                                                  const nextVols: Record<string, unknown> = { ...(volMetrics as Record<string, unknown>) }
+                                                  nextVols[v.name] = {
+                                                    ...(nextVols[v.name] as Record<string, unknown> | undefined),
+                                                    status: val,
+                                                  }
+                                                  setSnapshots((prev) => ({
+                                                    ...prev,
+                                                    [server.id]: {
+                                                      ...getOrInitSnapshot(server.id),
+                                                      readings: {
+                                                        ...getOrInitSnapshot(server.id).readings,
+                                                        [comp.id]: { ...compReadings, volumes: nextVols },
+                                                      },
+                                                    },
+                                                  }))
+                                                }}
+                                                options={[
+                                                  { value: "OK", label: "OK", variant: "primary" },
+                                                  { value: "FAIL", label: "FAIL", variant: "destructive" },
+                                                  { value: "N/A", label: "N/A", variant: "light" },
+                                                ]}
+                                              />
                                             </div>
-                                          ) : null}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <Input
-                                            type="number"
-                                            value={typeof used === "string" || typeof used === "number" ? String(used) : ""}
-                                            onChange={(e) => {
-                                              const nextVols: Record<string, unknown> = {
-                                                ...(volMetrics as Record<string, unknown>),
-                                              }
-                                              nextVols[v.name] = {
-                                                ...(nextVols[v.name] as Record<string, unknown> | undefined),
-                                                used: e.target.value,
-                                              }
-                                              setSnapshots((prev) => ({
-                                                ...prev,
-                                                [server.id]: {
-                                                  ...getOrInitSnapshot(server.id),
-                                                  readings: {
-                                                    ...getOrInitSnapshot(server.id).readings,
-                                                    [comp.id]: {
-                                                      ...compReadings,
-                                                      volumes: nextVols,
-                                                    },
-                                                  },
-                                                },
-                                              }))
-                                            }}
-                                            className="w-24"
-                                            placeholder="Used %"
-                                          />
-                                          <ChoiceButtons
-                                            value={typeof status === "string" ? status : ""}
-                                            onChange={(val) => {
-                                              const nextVols: Record<string, unknown> = {
-                                                ...(volMetrics as Record<string, unknown>),
-                                              }
-                                              nextVols[v.name] = {
-                                                ...(nextVols[v.name] as Record<string, unknown> | undefined),
-                                                status: val,
-                                              }
-                                              setSnapshots((prev) => ({
-                                                ...prev,
-                                                [server.id]: {
-                                                  ...getOrInitSnapshot(server.id),
-                                                  readings: {
-                                                    ...getOrInitSnapshot(server.id).readings,
-                                                    [comp.id]: {
-                                                      ...compReadings,
-                                                      volumes: nextVols,
-                                                    },
-                                                  },
-                                                },
-                                              }))
-                                            }}
-                                            options={[
-                                              { value: "OK", label: "OK", variant: "primary" },
-                                              { value: "FAIL", label: "FAIL", variant: "destructive" },
-                                              { value: "N/A", label: "N/A", variant: "light" },
-                                            ]}
-                                          />
-                                        </div>
+                                          )
+                                        })}
                                       </div>
                                     </div>
-                                  )
-                                })}
-                              </div>
+                                  </>
+                                )
+                              })()}
                             </div>
                           ) : (
                             <>
