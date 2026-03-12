@@ -7,7 +7,7 @@ import { Label } from "@/components/Label"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { RiArrowDownSLine, RiArrowRightSLine, RiEdit2Line, RiRefreshLine } from "@remixicon/react"
+import { RiArrowDownSLine, RiArrowRightSLine, RiCheckboxCircleFill, RiEdit2Line, RiRefreshLine } from "@remixicon/react"
 import type { MetricField } from "@/types"
 import { toast } from "@/lib/toast"
 import { SkeletonBlock } from "@/components/ui/Loading"
@@ -413,7 +413,10 @@ export default function MonitoringFormPage() {
                     onClick={() => setExpandedServerId(expanded ? null : server.id)}
                   >
                     <div className="flex items-center gap-2">
-                      {expanded ? <RiArrowDownSLine className="size-5 text-gray-500" /> : <RiArrowRightSLine className="size-5 text-gray-500" />}
+                      {expanded ? <RiArrowDownSLine className="size-5 shrink-0 text-gray-500" /> : <RiArrowRightSLine className="size-5 shrink-0 text-gray-500" />}
+                      {hasData ? (
+                        <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                      ) : null}
                       <span className="font-medium text-gray-900 dark:text-gray-50">{server.hostname}</span>
                       {server.ip_address && <span className="text-sm text-gray-500">{server.ip_address}</span>}
                       {!hasData && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">Belum diisi</span>}
@@ -514,7 +517,10 @@ export default function MonitoringFormPage() {
         return (
           <Card key={server.id} className="mb-8">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <h3 className="font-medium text-gray-900 dark:text-gray-50">
+              <h3 className="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-50">
+                {snapshots[server.id] ? (
+                  <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                ) : null}
                 {server.hostname}
                 {server.ip_address && (
                   <span className="ml-2 text-sm font-normal text-gray-500">
