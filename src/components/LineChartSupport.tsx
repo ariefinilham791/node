@@ -538,6 +538,10 @@ export const LineChartSupport = React.forwardRef<
     ...other
   } = props
 
+  if (!Array.isArray(data) || data.length === 0) {
+    return <div ref={ref} className={cx("h-80 w-full", className)} {...other} />
+  }
+
   function CustomCursor(props: any) {
     const { pointerEvents, height, points, className, payload, width } = props
     const label = payload[0]?.payload?.[index] // change it to your name of the index
