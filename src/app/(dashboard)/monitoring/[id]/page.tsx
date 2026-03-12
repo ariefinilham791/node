@@ -132,6 +132,19 @@ function computeDiskUsedSummary(volumes: Array<{ name: string; standard_gb: numb
   return { usedSummary, statusSummary }
 }
 
+function statusPillClasses(status: string) {
+  switch (status) {
+    case "OK":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900"
+    case "FAIL":
+      return "bg-red-50 text-red-700 ring-red-200 dark:bg-red-950/30 dark:text-red-300 dark:ring-red-900"
+    case "N/A":
+      return "bg-gray-50 text-gray-700 ring-gray-200 dark:bg-gray-900/40 dark:text-gray-300 dark:ring-gray-800"
+    default:
+      return "bg-gray-50 text-gray-600 ring-gray-200 dark:bg-gray-900/40 dark:text-gray-400 dark:ring-gray-800"
+  }
+}
+
 function ChoiceButtons({
   value,
   onChange,
@@ -705,7 +718,7 @@ export default function MonitoringFormPage() {
                           {volumes.length > 0 ? (
                             <div className="sm:col-span-2 lg:col-span-2">
                               <Label>Disk (summary)</Label>
-                              <div className="mt-2 space-y-2">
+                              <div className="mt-2 space-y-3">
                                 {(() => {
                                   const readingAny = compReadings as unknown as Record<string, unknown>
                                   const volMetricsRaw = readingAny.volumes
@@ -716,21 +729,32 @@ export default function MonitoringFormPage() {
                                       ? (volMetricsRaw as Record<string, unknown>)
                                       : {}
                                   const { usedSummary, statusSummary } = computeDiskUsedSummary(volumes, volMetrics)
+                                  const usedText = usedSummary == null ? null : `${usedSummary.toFixed(1)}%`
                                   return (
-                                    <div className="rounded-md border border-gray-200 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-950">
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-50">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusPillClasses(
+                                            statusSummary || "",
+                                          )}`}
+                                        >
                                           {statusSummary || "—"}
-                                          <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                                            Used: {usedSummary == null ? "—" : `${usedSummary.toFixed(1)}%`}
+                                        </span>
+                                        {usedText ? (
+                                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                                            Used: <span className="font-medium text-gray-900 dark:text-gray-50">{usedText}</span>
                                           </span>
-                                        </div>
+                                        ) : null}
                                       </div>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {volumes.length} volume
+                                        {volumes.length > 1 ? "s" : ""}
+                                      </span>
                                     </div>
                                   )
                                 })()}
-                                <div className="pt-1">
-                                  <Label>Volumes</Label>
+                                <div className="pt-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  Volumes
                                 </div>
                                 {volumes.map((v) => {
                                   const readingAny = compReadings as unknown as Record<
@@ -754,13 +778,15 @@ export default function MonitoringFormPage() {
                                       key={v.name}
                                       className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-950"
                                     >
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-50">
-                                          {v.name}
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="min-w-0">
+                                          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-50">
+                                            {v.name}
+                                          </div>
                                           {v.standard_gb != null ? (
-                                            <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                                              Std: {v.standard_gb} GB
-                                            </span>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                              Standard: {v.standard_gb} GB
+                                            </div>
                                           ) : null}
                                         </div>
                                         <div className="flex items-center gap-2">
