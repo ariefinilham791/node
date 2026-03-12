@@ -837,22 +837,23 @@ export async function insertServerSnapshot(data: {
     "SELECT id FROM server_snapshots WHERE session_id = ? AND server_id = ? LIMIT 1",
     [data.session_id, data.server_id]
   )
-  const existingId = rows?.[0]?.id ?? 0
+  return rows?.[0]?.id ?? 0
+}
 
-  // Tandai jadwal sebagai in_progress ketika ada snapshot (selama belum completed)
-  const [sessions] = await pool.execute<RowDataPacket[]>(
+/** Panggil sekali setelah simpan snapshot agar jadwal tampil "Continue". */
+export async function markScheduleInProgressBySessionId(
+  sessionId: number
+): Promise<void> {
+  const [rows] = await pool.execute<RowDataPacket[]>(
     "SELECT schedule_id FROM monitoring_sessions WHERE id = ? LIMIT 1",
-    [data.session_id]
+    [sessionId]
   )
-  const scheduleId = sessions?.[0]?.schedule_id as number | undefined
-  if (scheduleId) {
-    await pool.execute(
-      "UPDATE monitoring_schedules SET status = CASE WHEN status = 'completed' THEN status ELSE 'in_progress' END WHERE id = ?",
-      [scheduleId]
-    )
-  }
-
-  return existingId
+  const scheduleId = rows?.[0]?.schedule_id as number | undefined
+  if (!scheduleId) return
+  await pool.execute(
+    "UPDATE monitoring_schedules SET status = CASE WHEN status = 'completed' THEN status ELSE 'in_progress' END WHERE id = ?",
+    [scheduleId]
+  )
 }
 
 export type SnapshotForForm = {
@@ -874,51 +875,58 @@ export type SnapshotWithReadingsForForm = SnapshotForForm & {
 export async function getSessionSnapshotsForForm(
   sessionId: number
 ): Promise<SnapshotWithReadingsForForm[]> {
-  const [snapRows] = await pool.execute<RowDataPacket[]>(
-    `SELECT id, server_id, mem_used_pct, cpu_load_pct,
-            email_pop3, email_imap, web_service, overall_status, remark
-     FROM server_snapshots
-     WHERE session_id = ?`,
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT ss.id, ss.server_id, ss.mem_used_pct, ss.cpu_load_pct,
+            ss.email_pop3, ss.email_imap, ss.web_service, ss.overall_status, ss.remark,
+            cr.server_component_id, cr.metrics
+     FROM server_snapshots ss
+     LEFT JOIN component_readings cr ON cr.snapshot_id = ss.id
+     WHERE ss.session_id = ?
+     ORDER BY ss.id, cr.server_component_id`,
     [sessionId]
   )
-  const snaps = (snapRows ?? []) as SnapshotForForm[]
-  if (!snaps.length) return []
-
-  const snapshotIds = snaps.map((s) => s.id)
-  const placeholders = snapshotIds.map(() => "?").join(",")
-  const [readingRows] = await pool.execute<RowDataPacket[]>(
-    `SELECT snapshot_id, server_component_id, metrics
-     FROM component_readings
-     WHERE snapshot_id IN (${placeholders})`,
-    snapshotIds
-  )
-
-  const readingsBySnapshot = new Map<number, Record<number, Record<string, string>>>()
-  for (const r of (readingRows ?? []) as RowDataPacket[]) {
-    const sid = Number(r.snapshot_id)
-    const cid = Number(r.server_component_id)
-    let parsed: Record<string, unknown> = {}
-    try {
-      parsed =
-        typeof r.metrics === "string"
-          ? (JSON.parse(r.metrics) as Record<string, unknown>)
-          : ((r.metrics ?? {}) as Record<string, unknown>)
-    } catch {
-      parsed = {}
+  const raw = (rows ?? []) as RowDataPacket[]
+  const bySnapshot = new Map<
+    number,
+    { snap: SnapshotForForm; readings: Record<number, Record<string, string>> }
+  >()
+  for (const r of raw) {
+    const id = Number(r.id)
+    if (!bySnapshot.has(id)) {
+      bySnapshot.set(id, {
+        snap: {
+          id,
+          server_id: Number(r.server_id),
+          mem_used_pct: r.mem_used_pct != null ? Number(r.mem_used_pct) : null,
+          cpu_load_pct: r.cpu_load_pct != null ? Number(r.cpu_load_pct) : null,
+          email_pop3: String(r.email_pop3 ?? "N/A"),
+          email_imap: String(r.email_imap ?? "N/A"),
+          web_service: String(r.web_service ?? "N/A"),
+          overall_status: String(r.overall_status ?? "UNKNOWN"),
+          remark: r.remark != null ? String(r.remark) : null,
+        },
+        readings: {},
+      })
     }
-    const asString: Record<string, string> = {}
-    for (const [k, v] of Object.entries(parsed)) {
-      asString[k] = v != null ? String(v) : ""
+    const entry = bySnapshot.get(id)!
+    if (r.server_component_id != null) {
+      let parsed: Record<string, unknown> = {}
+      try {
+        parsed =
+          typeof r.metrics === "string"
+            ? (JSON.parse(r.metrics) as Record<string, unknown>)
+            : ((r.metrics ?? {}) as Record<string, unknown>)
+      } catch {
+        parsed = {}
+      }
+      const asString: Record<string, string> = {}
+      for (const [k, v] of Object.entries(parsed)) {
+        asString[k] = v != null ? String(v) : ""
+      }
+      entry.readings[Number(r.server_component_id)] = asString
     }
-    const byComponent = readingsBySnapshot.get(sid) ?? {}
-    byComponent[cid] = asString
-    readingsBySnapshot.set(sid, byComponent)
   }
-
-  return snaps.map((s) => ({
-    ...s,
-    readings: readingsBySnapshot.get(s.id) ?? {},
-  }))
+  return [...bySnapshot.values()].map(({ snap, readings }) => ({ ...snap, readings }))
 }
 
 export async function upsertComponentReading(
