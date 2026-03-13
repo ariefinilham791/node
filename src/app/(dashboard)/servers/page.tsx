@@ -317,7 +317,7 @@ export default function ServersPage() {
                             {s.hostname}
                           </Link>
                           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            {[s.name, s.location_name, s.ip_address].filter(Boolean).join(" • ")}
+                            {[s.name ?? s.os, s.location_name, s.ip_address].filter(Boolean).join(" • ")}
                           </p>
                         </div>
                         <Badge
@@ -422,7 +422,7 @@ export default function ServersPage() {
                             {s.hostname}
                           </Link>
                         </TableCell>
-                        <TableCell>{s.name ?? "—"}</TableCell>
+                        <TableCell>{s.name ?? s.os ?? "—"}</TableCell>
                         <TableCell>{s.ip_address ?? "—"}</TableCell>
                         <TableCell>{s.location_name}</TableCell>
                         <TableCell>{s.server_type}</TableCell>

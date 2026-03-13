@@ -29,6 +29,7 @@ type KPIs = {
     server_id: number
     hostname: string
     name: string | null
+    os: string | null
     ip_address: string | null
     location_name: string
     overall_status: string | null
@@ -226,7 +227,7 @@ export default function DashboardPage() {
                       {row.hostname}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name ?? row.os ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.location_name}</td>
                   <td className="px-4 py-3">
                     <span

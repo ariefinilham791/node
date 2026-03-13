@@ -17,6 +17,7 @@ type ServerWithComponents = {
   id: number
   hostname: string
   name: string | null
+  os: string | null
   ip_address: string | null
   sort_order: number
   components: {
@@ -555,7 +556,7 @@ export default function MonitoringFormPage() {
                         <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
                       ) : null}
                       <span className="font-medium text-gray-900 dark:text-gray-50">{server.hostname}</span>
-                      {server.name && <span className="text-sm text-gray-500">({server.name})</span>}
+                      {(server.name ?? server.os) && <span className="text-sm text-gray-500">({server.name ?? server.os})</span>}
                       {server.ip_address && <span className="text-sm text-gray-500">{server.ip_address}</span>}
                       {!hasFilledData && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">Belum diisi</span>}
                     </div>
@@ -674,7 +675,7 @@ export default function MonitoringFormPage() {
                   <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
                 ) : null}
                 {server.hostname}
-                {server.name && <span className="ml-1 text-sm font-normal text-gray-500">({server.name})</span>}
+                {(server.name ?? server.os) && <span className="ml-1 text-sm font-normal text-gray-500">({server.name ?? server.os})</span>}
                 {server.ip_address && (
                   <span className="ml-2 text-sm font-normal text-gray-500">
                     {server.ip_address}

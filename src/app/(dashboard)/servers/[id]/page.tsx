@@ -388,7 +388,7 @@ export default function ServerDetailPage() {
             <Badge variant="default">{server.server_type}</Badge>
           </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {[server.name, server.location_name, server.ip_address].filter(Boolean).join(" • ")}
+            {[server.name ?? server.os, server.location_name, server.ip_address].filter(Boolean).join(" • ")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -475,7 +475,7 @@ export default function ServerDetailPage() {
             </div>
             <div>
               <dt className="text-sm text-gray-500">Name</dt>
-              <dd className="font-medium">{server.name ?? "—"}</dd>
+              <dd className="font-medium">{server.name ?? server.os ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-500">IP</dt>

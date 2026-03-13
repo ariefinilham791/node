@@ -68,6 +68,7 @@ export type ServerLatestStatusRow = {
   server_id: number
   hostname: string
   name: string | null
+  os: string | null
   ip_address: string | null
   location_name: string
   overall_status: string | null
@@ -82,7 +83,7 @@ export type ServerLatestStatusRow = {
 export async function getServerLatestStatusTable(): Promise<ServerLatestStatusRow[]> {
   try {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT v.server_id, v.hostname, s.name, v.ip_address, v.location_name, v.overall_status,
+      `SELECT v.server_id, v.hostname, s.name, s.os, v.ip_address, v.location_name, v.overall_status,
               v.mem_used_pct, v.cpu_load_pct, v.email_pop3, v.email_imap, v.web_service, v.checked_at
        FROM v_server_latest_status v
        LEFT JOIN servers s ON s.id = v.server_id
@@ -93,12 +94,13 @@ export async function getServerLatestStatusTable(): Promise<ServerLatestStatusRo
     const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
     if (msg.includes("Unknown column") && msg.includes("name")) {
       const [rows] = await pool.execute<RowDataPacket[]>(
-        `SELECT server_id, hostname, ip_address, location_name, overall_status,
-                mem_used_pct, cpu_load_pct, email_pop3, email_imap, web_service, checked_at
-         FROM v_server_latest_status
-         ORDER BY location_name, hostname`
+        `SELECT v.server_id, v.hostname, s.os, v.ip_address, v.location_name, v.overall_status,
+                v.mem_used_pct, v.cpu_load_pct, v.email_pop3, v.email_imap, v.web_service, v.checked_at
+         FROM v_server_latest_status v
+         LEFT JOIN servers s ON s.id = v.server_id
+         ORDER BY v.location_name, v.hostname`
       )
-      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as ServerLatestStatusRow[]
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null, os: (r as RowDataPacket & { os?: string | null }).os ?? null })) as ServerLatestStatusRow[]
     }
     throw err
   }
@@ -1028,7 +1030,7 @@ export async function getServerComponents(
 export async function getServersByLocation(locationId: number) {
   try {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT s.id, s.hostname, s.name, s.ip_address, s.sort_order
+      `SELECT s.id, s.hostname, s.name, s.os, s.ip_address, s.sort_order
        FROM servers s
        WHERE s.location_id = ? AND s.physical_status = 'active'
        ORDER BY s.sort_order`,
@@ -1038,23 +1040,25 @@ export async function getServersByLocation(locationId: number) {
       id: r.id,
       hostname: r.hostname,
       name: r.name ?? (r as RowDataPacket & { Name?: string | null }).Name ?? null,
+      os: r.os ?? null,
       ip_address: r.ip_address ?? null,
       sort_order: r.sort_order,
-    })) as { id: number; hostname: string; name: string | null; ip_address: string | null; sort_order: number }[]
+    })) as { id: number; hostname: string; name: string | null; os: string | null; ip_address: string | null; sort_order: number }[]
   } catch (err: unknown) {
     const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
     if (msg.includes("Unknown column") && msg.includes("name")) {
       const [rows] = await pool.execute<RowDataPacket[]>(
-        `SELECT s.id, s.hostname, s.ip_address, s.sort_order
+        `SELECT s.id, s.hostname, s.os, s.ip_address, s.sort_order
          FROM servers s
          WHERE s.location_id = ? AND s.physical_status = 'active'
          ORDER BY s.sort_order`,
         [locationId]
       )
-      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as {
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null, os: r.os ?? null })) as {
         id: number
         hostname: string
         name: string | null
+        os: string | null
         ip_address: string | null
         sort_order: number
       }[]
