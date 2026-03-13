@@ -200,69 +200,6 @@ export default function DashboardPage() {
           </div>
         </Card>
       </div>
-      <Card className="mt-8 overflow-hidden p-0">
-        <h3 className="border-b border-gray-200 px-4 py-3 text-lg font-medium text-gray-900 dark:border-gray-800 dark:text-gray-50">
-          Server Status Overview
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50">
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">code asset</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Name</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Location</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Status</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">MEM%</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">CPU%</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Services</th>
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Last Checked</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(kpis?.serverTable ?? []).map((row) => (
-                <tr
-                  key={row.server_id}
-                  className="border-b border-gray-100 last:border-0 dark:border-gray-800"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/servers/${row.server_id}`}
-                      className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      {row.hostname}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name ?? row.os ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.location_name}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="rounded px-2 py-0.5 text-xs font-medium"
-                      style={{
-                        backgroundColor: `${STATUS_COLORS[row.overall_status ?? "UNKNOWN"]}20`,
-                        color: STATUS_COLORS[row.overall_status ?? "UNKNOWN"],
-                      }}
-                    >
-                      {row.overall_status ?? "UNKNOWN"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{row.mem_used_pct != null ? `${row.mem_used_pct}%` : "—"}</td>
-                  <td className="px-4 py-3">{row.cpu_load_pct != null ? `${row.cpu_load_pct}%` : "—"}</td>
-                  <td className="px-4 py-3">
-                    {[row.email_pop3, row.email_imap, row.web_service]
-                      .filter(Boolean)
-                      .join(" / ") || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                    {row.checked_at
-                      ? new Date(row.checked_at).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </main>
   )
 }

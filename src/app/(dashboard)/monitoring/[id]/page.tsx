@@ -482,16 +482,6 @@ export default function MonitoringFormPage() {
           )}
           {!pageLoading && hasSnapshotData && (
             <>
-              {viewMode === "list" ? (
-                <Button variant="secondary" className="!py-2" onClick={() => setViewMode("form")}>
-                  <RiEdit2Line className="mr-1.5 size-4" />
-                  Edit
-                </Button>
-              ) : (
-                <Button variant="light" className="!py-2" onClick={() => setViewMode("list")}>
-                  Lihat ringkasan
-                </Button>
-              )}
               <Button variant="secondary" className="!py-2" onClick={() => setResetConfirmOpen(true)}>
                 <RiRefreshLine className="mr-1.5 size-4" />
                 Reset data
@@ -526,100 +516,6 @@ export default function MonitoringFormPage() {
             </Card>
           ))}
         </div>
-      )}
-
-      {!pageLoading && viewMode === "list" && hasSnapshotData && (
-        <>
-          <Card className="mb-6 p-4">
-            <h3 className="font-medium text-gray-900 dark:text-gray-50">Kondisi Ruangan</h3>
-            <div className="mt-2 flex gap-6 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Suhu: {temperature ? `${temperature} °C` : "—"}</span>
-              <span className="text-gray-600 dark:text-gray-400">Kelembaban: {humidity ? `${humidity}%` : "—"}</span>
-            </div>
-          </Card>
-          <div className="space-y-2">
-            {servers.map((server) => {
-              const snap = snapshots[server.id]
-              const expanded = expandedServerId === server.id
-              const hasData = !!snap
-              const hasFilledData = snapshotIsFilled(snap, server)
-              return (
-                <Card key={server.id} className="overflow-hidden p-0">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50"
-                    onClick={() => setExpandedServerId(expanded ? null : server.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      {expanded ? <RiArrowDownSLine className="size-5 shrink-0 text-gray-500" /> : <RiArrowRightSLine className="size-5 shrink-0 text-gray-500" />}
-                      {hasFilledData ? (
-                        <RiCheckboxCircleFill className="size-5 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
-                      ) : null}
-                      <span className="font-medium text-gray-900 dark:text-gray-50">{server.hostname}</span>
-                      {(server.name ?? server.os) && <span className="text-sm text-gray-500">({server.name ?? server.os})</span>}
-                      {server.ip_address && <span className="text-sm text-gray-500">{server.ip_address}</span>}
-                      {!hasFilledData && <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">Belum diisi</span>}
-                    </div>
-                  </button>
-                  {expanded && (
-                    <div className="border-t border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
-                      {hasData && server.components?.length > 0 && snap && (
-                        <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-                          <h4 className="mb-2 text-xs font-medium uppercase tracking text-gray-500 dark:text-gray-400">Komponen</h4>
-                          <div className="space-y-3">
-                            {server.components.map((comp) => {
-                              const meta = getUsedFieldMeta(comp)
-                              const compReadings = snap.readings[comp.id] ?? {}
-                              const usedRaw = (compReadings as Record<string, unknown>).used
-                              const statusRaw = (compReadings as Record<string, unknown>).status
-                              const usedText =
-                                usedRaw == null || String(usedRaw).trim() === ""
-                                  ? "—"
-                                  : String(usedRaw)
-                              const statusText =
-                                statusRaw == null || String(statusRaw).trim() === ""
-                                  ? "—"
-                                  : String(statusRaw)
-                              return (
-                                <div key={comp.id} className="rounded border border-gray-200 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                  <p className="mb-1 font-medium text-gray-800 dark:text-gray-200">{comp.label} ({comp.type_name})</p>
-                                  <dl className="grid gap-1 sm:grid-cols-3">
-                                    <div>
-                                      <dt className="text-gray-500 dark:text-gray-400">Standard</dt>
-                                      <dd className="text-gray-900 dark:text-gray-50">
-                                        {formatStandard(comp.specs)}
-                                      </dd>
-                                    </div>
-                                    <div>
-                                      <dt className="text-gray-500 dark:text-gray-400">
-                                        Used{meta.unit ? ` (${meta.unit})` : ""}
-                                      </dt>
-                                      <dd className="text-gray-900 dark:text-gray-50">
-                                        {usedText}
-                                      </dd>
-                                    </div>
-                                    <div>
-                                      <dt className="text-gray-500 dark:text-gray-400">Checklist</dt>
-                                      <dd className="text-gray-900 dark:text-gray-50">
-                                        {statusText}
-                                      </dd>
-                                    </div>
-                                  </dl>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      {!hasData && <p className="text-sm text-gray-500 dark:text-gray-400">Data server ini belum diisi. Klik Edit untuk mengisi form.</p>}
-                    </div>
-                  )}
-                </Card>
-              )
-            })}
-          </div>
-          <ConfirmDialog open={resetConfirmOpen} title="Reset data monitoring?" description="Semua data yang sudah diisi (per server) akan dihapus dan form dikosongkan. Anda bisa mengisi ulang dari form." confirmText="Ya, kosongkan" cancelText="Batal" variant="destructive" loading={resetting} onConfirm={handleResetData} onCancel={() => setResetConfirmOpen(false)} />
-        </>
       )}
 
       {!pageLoading && (viewMode === "form" || !hasSnapshotData) && (
