@@ -30,6 +30,7 @@ export async function POST(request: Request) {
 
     const schema = z.object({
       hostname: z.string().min(1),
+      name: z.string().nullable().optional(),
       ip_address: z.string().nullable().optional(),
       os: z.string().nullable().optional(),
       server_type: z.string().min(1).optional(),
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
 
     const id = await createServer({
       hostname: parsed.data.hostname.trim(),
+      name: parsed.data.name?.trim() ?? null,
       ip_address: parsed.data.ip_address ?? null,
       os: parsed.data.os ?? null,
       server_type: (parsed.data.server_type ?? "general").trim(),

@@ -47,6 +47,7 @@ export async function PUT(request: Request, context: Context) {
     const schema = z
       .object({
         hostname: z.string().min(1).optional(),
+        name: z.string().nullable().optional(),
         ip_address: z.string().nullable().optional(),
         os: z.string().nullable().optional(),
         server_type: z.string().min(1).optional(),
@@ -61,6 +62,7 @@ export async function PUT(request: Request, context: Context) {
 
     await updateServer(id, {
       hostname: parsed.data.hostname,
+      name: parsed.data.name,
       ip_address: parsed.data.ip_address,
       os: parsed.data.os,
       server_type: parsed.data.server_type,

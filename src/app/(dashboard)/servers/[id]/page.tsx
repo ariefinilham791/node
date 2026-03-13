@@ -33,6 +33,7 @@ type DiskVolumeSpec = { name: string; standard_gb: number | "" }
 type Server = {
   id: number
   hostname: string
+  name: string | null
   ip_address: string | null
   os: string | null
   server_type: string
@@ -102,6 +103,7 @@ export default function ServerDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editServer, setEditServer] = useState(false)
   const [hostname, setHostname] = useState("")
+  const [name, setName] = useState("")
   const [ip_address, setIpAddress] = useState("")
   const [location_id, setLocationId] = useState("")
   const [locations, setLocations] = useState<{ id: number; name: string }[]>([])
@@ -171,6 +173,7 @@ export default function ServerDetailPage() {
   useEffect(() => {
     if (data?.server) {
       setHostname(data.server.hostname)
+      setName(data.server.name ?? "")
       setIpAddress(data.server.ip_address ?? "")
       setLocationId(String(data.server.location_id))
     }
@@ -182,6 +185,7 @@ export default function ServerDetailPage() {
     try {
       await apiPut<{ success: true }>(`/api/servers/${serverId}`, {
         hostname: hostname.trim(),
+        name: name.trim() || null,
         ip_address: ip_address.trim() || null,
         location_id: location_id ? Number(location_id) : undefined,
       })
@@ -384,8 +388,7 @@ export default function ServerDetailPage() {
             <Badge variant="default">{server.server_type}</Badge>
           </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {server.location_name}
-            {server.ip_address ? ` • ${server.ip_address}` : ""}
+            {[server.name, server.location_name, server.ip_address].filter(Boolean).join(" • ")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -425,10 +428,19 @@ export default function ServerDetailPage() {
         {editServer ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>Hostname</Label>
+              <Label>code asset</Label>
               <Input
                 value={hostname}
                 onChange={(e) => setHostname(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nama / Host name (opsional)"
                 className="mt-1"
               />
             </div>
@@ -458,8 +470,12 @@ export default function ServerDetailPage() {
         ) : (
           <dl className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
-              <dt className="text-sm text-gray-500">Hostname</dt>
+              <dt className="text-sm text-gray-500">code asset</dt>
               <dd className="font-medium">{server.hostname}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-gray-500">Name</dt>
+              <dd className="font-medium">{server.name ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-500">IP</dt>

@@ -17,6 +17,7 @@ export async function GET(_request: Request, context: Context) {
   const rows = await getSessionExportData(sessionId)
   const data = rows.map((r) => ({
     hostname: r.hostname,
+    name: r.name ?? "",
     ip_address: r.ip_address ?? "",
     mem_used_pct: r.mem_used_pct ?? "",
     cpu_load_pct: r.cpu_load_pct ?? "",

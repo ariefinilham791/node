@@ -67,6 +67,7 @@ export async function getServerStatusForDonut(): Promise<
 export type ServerLatestStatusRow = {
   server_id: number
   hostname: string
+  name: string | null
   ip_address: string | null
   location_name: string
   overall_status: string | null
@@ -80,10 +81,11 @@ export type ServerLatestStatusRow = {
 
 export async function getServerLatestStatusTable(): Promise<ServerLatestStatusRow[]> {
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT server_id, hostname, ip_address, location_name, overall_status,
-            mem_used_pct, cpu_load_pct, email_pop3, email_imap, web_service, checked_at
-     FROM v_server_latest_status
-     ORDER BY location_name, hostname`
+    `SELECT v.server_id, v.hostname, s.name, v.ip_address, v.location_name, v.overall_status,
+            v.mem_used_pct, v.cpu_load_pct, v.email_pop3, v.email_imap, v.web_service, v.checked_at
+     FROM v_server_latest_status v
+     LEFT JOIN servers s ON s.id = v.server_id
+     ORDER BY v.location_name, v.hostname`
   )
   return (rows ?? []) as ServerLatestStatusRow[]
 }
@@ -122,6 +124,7 @@ export async function getCompletionChart(): Promise<ChartRow[]> {
 export type ServerRow = {
   id: number
   hostname: string
+  name: string | null
   ip_address: string | null
   os: string | null
   server_type: string
@@ -132,13 +135,13 @@ export type ServerRow = {
 
 export async function getServersList(): Promise<ServerRow[]> {
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status,
+    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
             l.name AS location_name,
             COUNT(sc.id) AS component_count
      FROM servers s
      JOIN locations l ON s.location_id = l.id
      LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
-     GROUP BY s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
+     GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
      ORDER BY l.name, s.sort_order`
   )
   return (rows ?? []) as ServerRow[]
@@ -153,7 +156,7 @@ export type ServerRowWithNextCheck = ServerRow & ServerNextCheckRow
 
 export async function getServersListWithNextCheck(): Promise<ServerRowWithNextCheck[]> {
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status,
+    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
             l.name AS location_name,
             COUNT(sc.id) AS component_count,
             ns.next_schedule_id,
@@ -173,7 +176,7 @@ export async function getServersListWithNextCheck(): Promise<ServerRowWithNextCh
           AND ms.status <> 'completed'
         GROUP BY ms.location_id
      ) ns ON ns.location_id = s.location_id
-     GROUP BY s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
+     GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
      ORDER BY l.name, s.sort_order`
   )
   return (rows ?? []) as ServerRowWithNextCheck[]
@@ -259,6 +262,7 @@ export async function getOrCreateMonthlySchedule(locationId: number, now = new D
 
 export async function createServer(data: {
   hostname: string
+  name: string | null
   ip_address: string | null
   os: string | null
   server_type: string
@@ -267,10 +271,11 @@ export async function createServer(data: {
   sort_order: number
 }): Promise<number> {
   const [result] = await pool.execute<ResultSetHeader>(
-    `INSERT INTO servers (hostname, ip_address, os, server_type, physical_status, location_id, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO servers (hostname, name, ip_address, os, server_type, physical_status, location_id, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.hostname,
+      data.name ?? null,
       data.ip_address ?? null,
       data.os ?? null,
       data.server_type,
@@ -294,6 +299,7 @@ export async function hardDeleteServer(id: number): Promise<void> {
 export type ServerDetailRow = {
   id: number
   hostname: string
+  name: string | null
   ip_address: string | null
   os: string | null
   server_type: string
@@ -305,7 +311,7 @@ export type ServerDetailRow = {
 
 export async function getServerById(id: number): Promise<ServerDetailRow | null> {
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, s.location_id, s.sort_order, l.name AS location_name
+    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, s.location_id, s.sort_order, l.name AS location_name
      FROM servers s
      JOIN locations l ON s.location_id = l.id
      WHERE s.id = ? LIMIT 1`,
@@ -319,6 +325,7 @@ export async function updateServer(
   id: number,
   data: {
     hostname?: string
+    name?: string | null
     ip_address?: string | null
     os?: string | null
     server_type?: string
@@ -332,6 +339,10 @@ export async function updateServer(
   if (data.hostname !== undefined) {
     updates.push("hostname = ?")
     params.push(data.hostname)
+  }
+  if (data.name !== undefined) {
+    updates.push("name = ?")
+    params.push(data.name)
   }
   if (data.ip_address !== undefined) {
     updates.push("ip_address = ?")
@@ -860,13 +871,13 @@ export async function getServerComponents(
 // ─── Servers by location (for a schedule) ──────────────────────────────────
 export async function getServersByLocation(locationId: number) {
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.ip_address, s.sort_order
+    `SELECT s.id, s.hostname, s.name, s.ip_address, s.sort_order
      FROM servers s
      WHERE s.location_id = ? AND s.physical_status = 'active'
      ORDER BY s.sort_order`,
     [locationId]
   )
-  return (rows ?? []) as { id: number; hostname: string; ip_address: string | null; sort_order: number }[]
+  return (rows ?? []) as { id: number; hostname: string; name: string | null; ip_address: string | null; sort_order: number }[]
 }
 
 // ─── Save snapshot ──────────────────────────────────────────────────────────
@@ -1050,6 +1061,7 @@ export async function submitSession(
 // ─── Export: data for one session ───────────────────────────────────────────
 export type ExportRow = {
   hostname: string
+  name: string | null
   ip_address: string | null
   mem_used_pct: number | null
   cpu_load_pct: number | null
@@ -1070,7 +1082,7 @@ export async function getSessionExportData(
   sessionId: number
 ): Promise<ExportRow[]> {
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.hostname, s.ip_address,
+    `SELECT s.hostname, s.name, s.ip_address,
             ss.mem_used_pct, ss.cpu_load_pct, ss.email_pop3, ss.email_imap,
             ss.web_service, ss.av_pattern, ss.overall_status, ss.remark,
             ct.name AS component_type, sc.label AS component_label,

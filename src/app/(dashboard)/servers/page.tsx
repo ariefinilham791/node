@@ -33,6 +33,7 @@ import { SkeletonLines } from "@/components/ui/Loading"
 type Server = {
   id: number
   hostname: string
+  name: string | null
   ip_address: string | null
   os: string | null
   server_type: string
@@ -57,6 +58,7 @@ export default function ServersPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Server | null>(null)
   const [hostname, setHostname] = useState("")
+  const [name, setName] = useState("")
   const [ip, setIp] = useState("")
   const [serverType, setServerType] = useState("general")
   const [physicalStatus, setPhysicalStatus] = useState("active")
@@ -145,6 +147,7 @@ export default function ServersPage() {
   function openCreate() {
     setEditing(null)
     setHostname("")
+    setName("")
     setIp("")
     setServerType("general")
     setPhysicalStatus("active")
@@ -155,6 +158,7 @@ export default function ServersPage() {
   function openEdit(s: Server) {
     setEditing(s)
     setHostname(s.hostname)
+    setName(s.name ?? "")
     setIp(s.ip_address ?? "")
     setServerType(s.server_type || "general")
     setPhysicalStatus(s.physical_status || "active")
@@ -171,6 +175,7 @@ export default function ServersPage() {
       if (editing) {
         await apiPut<{ success: true }>(`/api/servers/${editing.id}`, {
           hostname: hostname.trim(),
+          name: name.trim() || null,
           ip_address: ip.trim() || null,
           server_type: serverType.trim(),
           physical_status: physicalStatus,
@@ -184,6 +189,7 @@ export default function ServersPage() {
         } else {
           await apiPost<{ id: number }>("/api/servers", {
             hostname: hostname.trim(),
+            name: name.trim() || null,
             ip_address: ip.trim() || null,
             server_type: serverType.trim(),
             physical_status: physicalStatus,
@@ -311,8 +317,7 @@ export default function ServersPage() {
                             {s.hostname}
                           </Link>
                           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            {s.location_name}
-                            {s.ip_address ? ` • ${s.ip_address}` : ""}
+                            {[s.name, s.location_name, s.ip_address].filter(Boolean).join(" • ")}
                           </p>
                         </div>
                         <Badge
@@ -391,7 +396,8 @@ export default function ServersPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableHeaderCell>Hostname</TableHeaderCell>
+                      <TableHeaderCell>code asset</TableHeaderCell>
+                      <TableHeaderCell>Name</TableHeaderCell>
                       <TableHeaderCell>IP</TableHeaderCell>
                       <TableHeaderCell>Lokasi</TableHeaderCell>
                       <TableHeaderCell>Tipe</TableHeaderCell>
@@ -416,6 +422,7 @@ export default function ServersPage() {
                             {s.hostname}
                           </Link>
                         </TableCell>
+                        <TableCell>{s.name ?? "—"}</TableCell>
                         <TableCell>{s.ip_address ?? "—"}</TableCell>
                         <TableCell>{s.location_name}</TableCell>
                         <TableCell>{s.server_type}</TableCell>
@@ -510,8 +517,12 @@ export default function ServersPage() {
           </DialogHeader>
           <div className="mt-4 space-y-3">
             <div>
-              <Label>Hostname</Label>
+              <Label>code asset</Label>
               <Input value={hostname} onChange={(e) => setHostname(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label>Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama / Host name (opsional)" className="mt-1" />
             </div>
             <div>
               <Label>IP Address</Label>

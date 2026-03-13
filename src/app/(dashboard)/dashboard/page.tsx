@@ -28,6 +28,7 @@ type KPIs = {
   serverTable: {
     server_id: number
     hostname: string
+    name: string | null
     ip_address: string | null
     location_name: string
     overall_status: string | null
@@ -201,7 +202,8 @@ export default function DashboardPage() {
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50">
-                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Hostname</th>
+                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">code asset</th>
+                <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Name</th>
                 <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Location</th>
                 <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">Status</th>
                 <th className="px-4 py-3 font-medium text-gray-900 dark:text-gray-50">MEM%</th>
@@ -224,6 +226,7 @@ export default function DashboardPage() {
                       {row.hostname}
                     </Link>
                   </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.name ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{row.location_name}</td>
                   <td className="px-4 py-3">
                     <span
