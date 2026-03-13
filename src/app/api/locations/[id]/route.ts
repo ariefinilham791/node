@@ -24,7 +24,6 @@ export async function PUT(request: Request, context: Context) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
 
     const id = Number((await context.params).id)
     if (!id) return jsonError("Invalid id", 400)
@@ -59,7 +58,6 @@ export async function DELETE(request: Request, context: Context) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
     const id = Number((await context.params).id)
     if (!id) return jsonError("Invalid id", 400)
     const { searchParams } = new URL(request.url)

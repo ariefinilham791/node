@@ -15,7 +15,7 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 
 type KPIs = {
@@ -63,34 +63,39 @@ export default function DashboardPage() {
   const [chartData, setChartData] = useState<ChartPoint[]>([])
 
   useEffect(() => {
-    fetch("/api/dashboard/kpis")
+    let cancelled = false
+    fetch("/api/dashboard")
       .then((r) => r.json())
-      .then(setKpis)
+      .then((data) => {
+        if (!cancelled && data) {
+          setKpis(data.kpis ?? null)
+          setChartData(Array.isArray(data.chart) ? data.chart : [])
+        }
+      })
       .catch(() => {})
-  }, [])
-  useEffect(() => {
-    fetch("/api/dashboard/chart")
-      .then((r) => r.json())
-      .then(setChartData)
-      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const chartByWeek = chartData.reduce<Record<string, ChartPoint[]>>((acc, row) => {
-    const key = row.week_start
-    if (!acc[key]) acc[key] = []
-    acc[key].push(row)
-    return acc
-  }, {})
-  const chartSeries = Object.entries(chartByWeek).map(([week_start, rows]) => ({
-    week_start: week_start.slice(0, 10),
-    ...rows.reduce(
-      (a, r) => {
-        a[r.location_name] = r.completion_pct
-        return a
-      },
-      {} as Record<string, number>
-    ),
-  }))
+  const chartSeries = useMemo(() => {
+    const chartByWeek = chartData.reduce<Record<string, ChartPoint[]>>((acc, row) => {
+      const key = row.week_start
+      if (!acc[key]) acc[key] = []
+      acc[key].push(row)
+      return acc
+    }, {})
+    return Object.entries(chartByWeek).map(([week_start, rows]) => ({
+      week_start: week_start.slice(0, 10),
+      ...rows.reduce(
+        (a, r) => {
+          a[r.location_name] = r.completion_pct
+          return a
+        },
+        {} as Record<string, number>
+      ),
+    }))
+  }, [chartData])
 
   return (
     <main>

@@ -48,8 +48,6 @@ export default function ServersPage() {
   const router = useRouter()
   const [servers, setServers] = useState<Server[]>([])
   const [loading, setLoading] = useState(true)
-  const [role, setRole] = useState<string>("")
-  const isAdmin = role === "admin"
   const [componentTypes, setComponentTypes] = useState<Array<{ id: number; name: string }>>([])
 
   const [locations, setLocations] = useState<{ id: number; name: string }[]>(
@@ -94,16 +92,22 @@ export default function ServersPage() {
   }
 
   useEffect(() => {
-    load()
-    apiGet<{ user: { role: string } }>("/api/auth/me")
-      .then((d) => setRole(d?.user?.role ?? ""))
-      .catch(() => {})
-    apiGet<{ id: number; name: string }[]>("/api/locations")
-      .then((list) => setLocations(list))
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Gagal memuat lokasi"))
-    apiGet<Array<{ id: number; name: string }>>("/api/component-types")
-      .then(setComponentTypes)
-      .catch(() => {})
+    setLoading(true)
+    Promise.all([
+      apiGet<Server[]>("/api/servers?include=next-check"),
+      apiGet<{ id: number; name: string }[]>("/api/locations"),
+      apiGet<Array<{ id: number; name: string }>>("/api/component-types"),
+    ])
+      .then(([serversData, locationsData, typesData]) => {
+        setServers(serversData)
+        setLocations(locationsData)
+        setComponentTypes(typesData)
+      })
+      .catch((e) => {
+        toast.error(e instanceof Error ? e.message : "Gagal memuat data")
+        setServers([])
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   async function handleCheckNow(serverId: number) {
@@ -125,7 +129,6 @@ export default function ServersPage() {
   }
 
   async function handleSaveComponent() {
-    if (!isAdmin) return
     if (!compServerId || !compTypeId || !compLabel.trim()) return
     setCompSaving(true)
     try {
@@ -168,7 +171,6 @@ export default function ServersPage() {
   }
 
   async function handleSave() {
-    if (!isAdmin) return
     if (!hostname.trim()) return
     setSaving(true)
     try {
@@ -209,7 +211,6 @@ export default function ServersPage() {
   }
 
   async function handleDeactivate(s: Server) {
-    if (!isAdmin) return
     setConfirmTitle("Nonaktifkan server?")
     setConfirmDesc(`Server "${s.hostname}" akan menjadi inactive.`)
     setConfirmVariant("destructive")
@@ -230,7 +231,6 @@ export default function ServersPage() {
   }
 
   async function handleActivate(s: Server) {
-    if (!isAdmin) return
     setConfirmTitle("Aktifkan server?")
     setConfirmDesc(`Server "${s.hostname}" akan diaktifkan kembali.`)
     setConfirmVariant("default")
@@ -253,7 +253,6 @@ export default function ServersPage() {
   }
 
   async function handleHardDelete(s: Server) {
-    if (!isAdmin) return
     setConfirmTitle("Delete permanen server?")
     setConfirmDesc(
       `Server "${s.hostname}" akan dihapus permanen. Jika server punya snapshot/relasi, operasi bisa gagal.`,
@@ -286,12 +285,10 @@ export default function ServersPage() {
             Server yang dimonitor per lokasi
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={openCreate} className="gap-2">
-            <RiAddLine className="size-4" />
-            Tambah Server
-          </Button>
-        )}
+        <Button onClick={openCreate} className="gap-2">
+          <RiAddLine className="size-4" />
+          Tambah Server
+        </Button>
       </div>
       <Card className="mt-8 overflow-hidden p-0">
         {loading ? (
@@ -342,48 +339,46 @@ export default function ServersPage() {
                           </p>
                         </div>
                       </div>
-                      {isAdmin && (
-                        <div className="mt-4 flex flex-wrap gap-2">
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          variant="secondary"
+                          className="!py-2 !text-sm"
+                          onClick={() => openEdit(s)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="light"
+                          className="!py-2 !text-sm"
+                          onClick={() => openAddComponent(s)}
+                        >
+                          + Komponen
+                        </Button>
+                        {s.physical_status === "active" ? (
                           <Button
-                            variant="secondary"
+                            variant="warning"
                             className="!py-2 !text-sm"
-                            onClick={() => openEdit(s)}
+                            onClick={() => handleDeactivate(s)}
                           >
-                            Edit
+                            Nonaktifkan
                           </Button>
+                        ) : (
                           <Button
                             variant="light"
                             className="!py-2 !text-sm"
-                            onClick={() => openAddComponent(s)}
+                            onClick={() => handleActivate(s)}
                           >
-                            + Komponen
+                            Aktifkan
                           </Button>
-                          {s.physical_status === "active" ? (
-                            <Button
-                              variant="warning"
-                              className="!py-2 !text-sm"
-                              onClick={() => handleDeactivate(s)}
-                            >
-                              Nonaktifkan
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="light"
-                              className="!py-2 !text-sm"
-                              onClick={() => handleActivate(s)}
-                            >
-                              Aktifkan
-                            </Button>
-                          )}
-                          <Button
-                            variant="destructive"
-                            className="!py-2 !text-sm"
-                            onClick={() => handleHardDelete(s)}
-                          >
-                            Delete Permanen
-                          </Button>
-                        </div>
-                      )}
+                        )}
+                        <Button
+                          variant="destructive"
+                          className="!py-2 !text-sm"
+                          onClick={() => handleHardDelete(s)}
+                        >
+                          Delete Permanen
+                        </Button>
+                      </div>
                     </Card>
                   ))}
                 </div>
@@ -404,11 +399,9 @@ export default function ServersPage() {
                       <TableHeaderCell>Status</TableHeaderCell>
                       <TableHeaderCell>Komponen</TableHeaderCell>
                       <TableHeaderCell>Pengecekan selanjutnya</TableHeaderCell>
-                      {isAdmin && (
-                        <TableHeaderCell className="text-right">
-                          Action
-                        </TableHeaderCell>
-                      )}
+                      <TableHeaderCell className="text-right">
+                        Action
+                      </TableHeaderCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -447,59 +440,57 @@ export default function ServersPage() {
                               })
                             : "—"}
                         </TableCell>
-                        {isAdmin && (
-                          <TableCell className="text-right">
-                            <div className="inline-flex items-center gap-2">
+                        <TableCell className="text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <Button
+                              variant="primary"
+                              className="!py-1.5 !text-xs"
+                              onClick={() => handleCheckNow(s.id)}
+                            >
+                              Cek sekarang
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              className="gap-1 !py-1.5 !text-xs"
+                              onClick={() => openEdit(s)}
+                            >
+                              <RiEdit2Line className="size-4" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="light"
+                              className="gap-1 !py-1.5 !text-xs"
+                              onClick={() => openAddComponent(s)}
+                            >
+                              + Komponen
+                            </Button>
+                            {s.physical_status === "active" ? (
                               <Button
-                                variant="primary"
-                                className="!py-1.5 !text-xs"
-                                onClick={() => handleCheckNow(s.id)}
-                              >
-                                Cek sekarang
-                              </Button>
-                              <Button
-                                variant="secondary"
+                                variant="warning"
                                 className="gap-1 !py-1.5 !text-xs"
-                                onClick={() => openEdit(s)}
+                                onClick={() => handleDeactivate(s)}
                               >
-                                <RiEdit2Line className="size-4" />
-                                Edit
+                                <RiShutDownLine className="size-4" />
+                                Nonaktifkan
                               </Button>
+                            ) : (
                               <Button
                                 variant="light"
                                 className="gap-1 !py-1.5 !text-xs"
-                                onClick={() => openAddComponent(s)}
+                                onClick={() => handleActivate(s)}
                               >
-                                + Komponen
+                                Aktifkan
                               </Button>
-                              {s.physical_status === "active" ? (
-                                <Button
-                                  variant="warning"
-                                  className="gap-1 !py-1.5 !text-xs"
-                                  onClick={() => handleDeactivate(s)}
-                                >
-                                  <RiShutDownLine className="size-4" />
-                                  Nonaktifkan
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="light"
-                                  className="gap-1 !py-1.5 !text-xs"
-                                  onClick={() => handleActivate(s)}
-                                >
-                                  Aktifkan
-                                </Button>
-                              )}
-                              <Button
-                                variant="destructive"
-                                className="gap-1 !py-1.5 !text-xs"
-                                onClick={() => handleHardDelete(s)}
-                              >
-                                Delete Permanen
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
+                            )}
+                            <Button
+                              variant="destructive"
+                              className="gap-1 !py-1.5 !text-xs"
+                              onClick={() => handleHardDelete(s)}
+                            >
+                              Delete Permanen
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

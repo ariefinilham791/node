@@ -26,7 +26,6 @@ export async function POST(request: Request) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
 
     const schema = z.object({
       hostname: z.string().min(1),

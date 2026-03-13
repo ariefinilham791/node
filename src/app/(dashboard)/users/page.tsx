@@ -69,10 +69,20 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    load()
-    apiGet<Location[]>("/api/locations")
-      .then(setLocations)
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Gagal memuat lokasi"))
+    setLoading(true)
+    Promise.all([
+      apiGet<User[]>("/api/users?list=1"),
+      apiGet<Location[]>("/api/locations"),
+    ])
+      .then(([usersData, locationsData]) => {
+        setList(usersData)
+        setLocations(locationsData)
+      })
+      .catch((e) => {
+        toast.error(e instanceof Error ? e.message : "Gagal memuat data")
+        setList([])
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   function openCreate() {

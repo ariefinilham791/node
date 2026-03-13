@@ -122,7 +122,6 @@ export default function ServerDetailPage() {
   const [compVolumes, setCompVolumes] = useState<DiskVolumeSpec[]>([])
   const [compSpecsJson, setCompSpecsJson] = useState("")
   const [compSaving, setCompSaving] = useState(false)
-  const [role, setRole] = useState<string>("")
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Component | null>(null)
@@ -130,15 +129,30 @@ export default function ServerDetailPage() {
   const load = useCallback(() => {
     if (!serverId) return
     setLoading(true)
-    apiGet<{
-      server: Server
-      components: Component[]
-      latestSnapshot: LatestSnapshot | null
-      componentReadings: ComponentReading[]
-    }>(`/api/servers/${serverId}`)
-      .then(setData)
+    Promise.all([
+      apiGet<{
+        server: Server
+        components: Component[]
+        latestSnapshot: LatestSnapshot | null
+        componentReadings: ComponentReading[]
+      }>(`/api/servers/${serverId}`),
+      apiGet<ComponentType[]>("/api/component-types"),
+      apiGet<{ id: number; name: string }[]>("/api/locations?all=1"),
+    ])
+      .then(([serverData, typesData, locationsData]) => {
+        setData(serverData)
+        setComponentTypes(
+          typesData.map((c) => ({
+            id: c.id,
+            name: (c as unknown as { name: string }).name,
+            category: (c as unknown as { category: string }).category,
+            unit_label: (c as unknown as { unit_label: string | null }).unit_label ?? null,
+          })),
+        )
+        setLocations(locationsData)
+      })
       .catch((e) => {
-        toast.error(e instanceof Error ? e.message : "Gagal memuat server")
+        toast.error(e instanceof Error ? e.message : "Gagal memuat data")
         setData(null)
       })
       .finally(() => setLoading(false))
@@ -146,29 +160,8 @@ export default function ServerDetailPage() {
 
   useEffect(() => {
     load()
-    apiGet<ComponentType[]>("/api/component-types")
-      .then((list) =>
-        setComponentTypes(
-          list.map((c) => ({
-            id: c.id,
-            name: (c as unknown as { name: string }).name,
-            category: (c as unknown as { category: string }).category,
-            unit_label: (c as unknown as { unit_label: string | null }).unit_label ?? null,
-          })),
-        ),
-      )
-      .catch(() => {})
-    apiGet<{ id: number; name: string }[]>("/api/locations?all=1")
-      .then((list) => setLocations(list))
-      .catch(() => {})
   }, [load])
 
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setRole(d?.user?.role ?? ""))
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (data?.server) {
@@ -366,7 +359,6 @@ export default function ServerDetailPage() {
   }
 
   const { server, components, latestSnapshot, componentReadings } = data
-  const isAdmin = role === "admin"
 
   return (
     <main>
@@ -406,24 +398,23 @@ export default function ServerDetailPage() {
           <h3 className="font-medium text-gray-900 dark:text-gray-50">
             Info Server
           </h3>
-          {isAdmin &&
-            (!editServer ? (
-              <Button variant="secondary" onClick={() => setEditServer(true)}>
-                <span className="inline-flex items-center gap-2">
-                  <RiEdit2Line className="size-4" />
-                  Edit
-                </span>
+          {!editServer ? (
+            <Button variant="secondary" onClick={() => setEditServer(true)}>
+              <span className="inline-flex items-center gap-2">
+                <RiEdit2Line className="size-4" />
+                Edit
+              </span>
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setEditServer(false)}>
+                Batal
               </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setEditServer(false)}>
-                  Batal
-                </Button>
-                <Button onClick={handleSaveServer} isLoading={saving}>
-                  Simpan
-                </Button>
-              </div>
-            ))}
+              <Button onClick={handleSaveServer} isLoading={saving}>
+                Simpan
+              </Button>
+            </div>
+          )}
         </div>
         {editServer ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -505,12 +496,10 @@ export default function ServerDetailPage() {
           <h3 className="font-medium text-gray-900 dark:text-gray-50">
             Komponen
           </h3>
-          {isAdmin && (
-            <Button onClick={openAddComponent} className="gap-2">
-              <RiAddLine className="size-4" />
-              Tambah Komponen
-            </Button>
-          )}
+          <Button onClick={openAddComponent} className="gap-2">
+            <RiAddLine className="size-4" />
+            Tambah Komponen
+          </Button>
         </div>
         <div className="mt-4">
           <TableRoot>
@@ -541,26 +530,22 @@ export default function ServerDetailPage() {
                       </TableCell>
                       <TableCell>{c.slot_index}</TableCell>
                       <TableCell className="text-right">
-                        {isAdmin ? (
-                          <div className="inline-flex items-center gap-2">
-                            <Button
-                              variant="secondary"
-                              className="!py-1.5 !text-xs"
-                              onClick={() => openEditComponent(c)}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              className="!py-1.5 !text-xs"
-                              onClick={() => handleDeleteComponent(c)}
-                            >
-                              Hapus
-                            </Button>
-                          </div>
-                        ) : (
-                          "—"
-                        )}
+                        <div className="inline-flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            className="!py-1.5 !text-xs"
+                            onClick={() => openEditComponent(c)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            className="!py-1.5 !text-xs"
+                            onClick={() => handleDeleteComponent(c)}
+                          >
+                            Hapus
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

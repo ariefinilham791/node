@@ -10,10 +10,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const all = searchParams.get("all") === "1"
-    const locations =
-      all && session.role === "admin"
-        ? await getLocationsListAll()
-        : await getLocationsList()
+    const locations = all ? await getLocationsListAll() : await getLocationsList()
     return jsonOk(locations)
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Server error"
@@ -25,7 +22,6 @@ export async function POST(request: Request) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
 
     const schema = z.object({
       name: z.string().min(1),

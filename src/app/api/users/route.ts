@@ -12,7 +12,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const list = searchParams.get("list") === "1"
     if (list) {
-      if (session.role !== "admin") return jsonError("Forbidden", 403)
       const users = await getUsersList()
       return jsonOk(users)
     }
@@ -31,7 +30,6 @@ export async function POST(request: Request) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
 
     const schema = z.object({
       username: z.string().min(1),

@@ -9,7 +9,6 @@ export async function PUT(request: Request, context: Context) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
     const cid = Number((await context.params).cid)
     if (!cid) return jsonError("Invalid component id", 400)
 
@@ -36,7 +35,6 @@ export async function DELETE(_request: Request, context: Context) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
     const cid = Number((await context.params).cid)
     if (!cid) return jsonError("Invalid component id", 400)
     await deleteServerComponent(cid)

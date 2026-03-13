@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
 import {
   RiHomeLine,
   RiCalendarLine,
@@ -19,9 +18,6 @@ const navItems = [
   { href: "/monitoring", label: "Monthly Monitoring", icon: RiCalendarLine },
   { href: "/servers", label: "Servers", icon: RiServerLine },
   { href: "/export", label: "Export", icon: RiDownloadLine },
-]
-
-const adminOnlyItems = [
   { href: "/component-types", label: "Component Types", icon: RiCpuLine },
   { href: "/locations", label: "Locations", icon: RiMapPinLine },
   { href: "/users", label: "Users", icon: RiUserLine },
@@ -29,32 +25,19 @@ const adminOnlyItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const [userRole, setUserRole] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setUserRole(data?.user?.role ?? null))
-      .catch(() => {})
-  }, [])
-
-  const isAdmin = userRole === "admin"
-
   return (
     <aside className="fixed left-0 top-0 z-10 hidden h-screen md:flex">
-      <SidebarContent pathname={pathname} isAdmin={isAdmin} />
+      <SidebarContent pathname={pathname} onNavigate={undefined} className={undefined} />
     </aside>
   )
 }
 
 export function SidebarContent({
   pathname,
-  isAdmin,
   onNavigate,
   className,
 }: {
   pathname: string
-  isAdmin: boolean
   onNavigate?: () => void
   className?: string
 }) {
@@ -92,34 +75,6 @@ export function SidebarContent({
             </Link>
           )
         })}
-        {isAdmin && (
-          <>
-            <div className="my-2 border-t border-gray-200 dark:border-gray-800" />
-            <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Admin
-            </p>
-            {adminOnlyItems.map((item) => {
-              const Icon = item.icon
-              const active = pathname === item.href || pathname.startsWith(item.href + "/")
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={cx(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                  )}
-                >
-                  <Icon className="size-5 shrink-0" />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </>
-        )}
       </nav>
     </aside>
   )

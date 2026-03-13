@@ -9,7 +9,6 @@ export async function POST(request: Request, context: Context) {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
 
     const serverId = Number((await context.params).id)
     if (!serverId) return jsonError("Invalid server id", 400)

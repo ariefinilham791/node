@@ -212,23 +212,23 @@ export default function MonitoringFormPage() {
   useEffect(() => {
     if (!scheduleId) return
     setLoadingSession(true)
-    fetch(`/api/schedules/${scheduleId}/session`)
-      .then((r) => r.json())
-      .then((data) => {
-        setSessionId(data.sessionId ?? null)
-      })
-      .catch(() => setSessionId(null))
-      .finally(() => setLoadingSession(false))
-  }, [scheduleId])
-
-  useEffect(() => {
-    if (!scheduleId) return
     setLoadingServers(true)
-    fetch(`/api/schedules/${scheduleId}/servers`)
-      .then((r) => r.json())
-      .then(setServers)
-      .catch(() => setServers([]))
-      .finally(() => setLoadingServers(false))
+    Promise.all([
+      fetch(`/api/schedules/${scheduleId}/session`).then((r) => r.json()),
+      fetch(`/api/schedules/${scheduleId}/servers`).then((r) => r.json()),
+    ])
+      .then(([sessionData, serversData]) => {
+        setSessionId(sessionData.sessionId ?? null)
+        setServers(Array.isArray(serversData) ? serversData : [])
+      })
+      .catch(() => {
+        setSessionId(null)
+        setServers([])
+      })
+      .finally(() => {
+        setLoadingSession(false)
+        setLoadingServers(false)
+      })
   }, [scheduleId])
 
   useEffect(() => {

@@ -4,23 +4,13 @@ import { Sidebar, SidebarContent } from "./Sidebar"
 import { DropdownUserProfile } from "./UserProfile"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/Drawer"
 import { Button } from "@/components/Button"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { RiMenuLine } from "@remixicon/react"
 import { usePathname } from "next/navigation"
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [role, setRole] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setRole(data?.user?.role ?? null))
-      .catch(() => {})
-  }, [])
-
-  const isAdmin = role === "admin"
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -40,7 +30,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </DrawerHeader>
                 <SidebarContent
                   pathname={pathname}
-                  isAdmin={isAdmin}
                   onNavigate={() => setDrawerOpen(false)}
                   className="w-full border-r-0"
                 />
