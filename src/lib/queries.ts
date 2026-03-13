@@ -150,16 +150,26 @@ export type ServerRow = {
 export async function getServersList(): Promise<ServerRow[]> {
   try {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
-              l.name AS location_name,
-              COUNT(sc.id) AS component_count
-       FROM servers s
-       JOIN locations l ON s.location_id = l.id
-       LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
-       GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
-       ORDER BY l.name, s.sort_order`
-    )
-    return (rows ?? []) as ServerRow[]
+    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
+            l.name AS location_name,
+            COUNT(sc.id) AS component_count
+     FROM servers s
+     JOIN locations l ON s.location_id = l.id
+     LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
+     GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
+     ORDER BY l.name, s.sort_order`
+  )
+  return ((rows ?? []) as RowDataPacket[]).map((r) => ({
+    id: r.id,
+    hostname: r.hostname,
+    name: r.name ?? (r as RowDataPacket & { Name?: string | null }).Name ?? null,
+    ip_address: r.ip_address ?? null,
+    os: r.os ?? null,
+    server_type: r.server_type,
+    physical_status: r.physical_status,
+    location_name: r.location_name,
+    component_count: Number(r.component_count),
+  })) as ServerRow[]
   } catch (err: unknown) {
     const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
     if (msg.includes("Unknown column") && msg.includes("name")) {
@@ -212,7 +222,19 @@ export async function getServersListWithNextCheck(): Promise<ServerRowWithNextCh
        GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
        ORDER BY l.name, s.sort_order`
     )
-    return (rows ?? []) as ServerRowWithNextCheck[]
+    return ((rows ?? []) as RowDataPacket[]).map((row) => ({
+      id: row.id,
+      hostname: row.hostname,
+      name: row.name ?? (row as RowDataPacket & { Name?: string | null }).Name ?? null,
+      ip_address: row.ip_address ?? null,
+      os: row.os ?? null,
+      server_type: row.server_type,
+      physical_status: row.physical_status,
+      location_name: row.location_name,
+      component_count: Number(row.component_count),
+      next_schedule_id: row.next_schedule_id ?? null,
+      next_due_date: row.next_due_date ?? null,
+    })) as ServerRowWithNextCheck[]
   } catch (err: unknown) {
     const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
     if (msg.includes("Unknown column") && msg.includes("name")) {
@@ -403,8 +425,20 @@ export async function getServerById(id: number): Promise<ServerDetailRow | null>
        WHERE s.id = ? LIMIT 1`,
       [id]
     )
-    const r = (rows ?? [])[0]
-    return r ? (r as ServerDetailRow) : null
+    const r = (rows ?? [])[0] as RowDataPacket | undefined
+    if (!r) return null
+    return {
+      id: r.id,
+      hostname: r.hostname,
+      name: r.name ?? (r as RowDataPacket & { Name?: string | null }).Name ?? null,
+      ip_address: r.ip_address ?? null,
+      os: r.os ?? null,
+      server_type: r.server_type,
+      physical_status: r.physical_status,
+      location_id: r.location_id,
+      location_name: r.location_name,
+      sort_order: r.sort_order,
+    } as ServerDetailRow
   } catch (err: unknown) {
     const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
     if (msg.includes("Unknown column") && msg.includes("name")) {
@@ -415,8 +449,12 @@ export async function getServerById(id: number): Promise<ServerDetailRow | null>
          WHERE s.id = ? LIMIT 1`,
         [id]
       )
-      const r = (rows ?? [])[0]
-      return r ? { ...r, name: null } as ServerDetailRow : null
+      const r = (rows ?? [])[0] as RowDataPacket | undefined
+      if (!r) return null
+      return {
+        ...r,
+        name: null,
+      } as ServerDetailRow
     }
     throw err
   }
@@ -996,7 +1034,13 @@ export async function getServersByLocation(locationId: number) {
        ORDER BY s.sort_order`,
       [locationId]
     )
-    return (rows ?? []) as { id: number; hostname: string; name: string | null; ip_address: string | null; sort_order: number }[]
+    return ((rows ?? []) as RowDataPacket[]).map((r) => ({
+      id: r.id,
+      hostname: r.hostname,
+      name: r.name ?? (r as RowDataPacket & { Name?: string | null }).Name ?? null,
+      ip_address: r.ip_address ?? null,
+      sort_order: r.sort_order,
+    })) as { id: number; hostname: string; name: string | null; ip_address: string | null; sort_order: number }[]
   } catch (err: unknown) {
     const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
     if (msg.includes("Unknown column") && msg.includes("name")) {
