@@ -80,14 +80,28 @@ export type ServerLatestStatusRow = {
 }
 
 export async function getServerLatestStatusTable(): Promise<ServerLatestStatusRow[]> {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT v.server_id, v.hostname, s.name, v.ip_address, v.location_name, v.overall_status,
-            v.mem_used_pct, v.cpu_load_pct, v.email_pop3, v.email_imap, v.web_service, v.checked_at
-     FROM v_server_latest_status v
-     LEFT JOIN servers s ON s.id = v.server_id
-     ORDER BY v.location_name, v.hostname`
-  )
-  return (rows ?? []) as ServerLatestStatusRow[]
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT v.server_id, v.hostname, s.name, v.ip_address, v.location_name, v.overall_status,
+              v.mem_used_pct, v.cpu_load_pct, v.email_pop3, v.email_imap, v.web_service, v.checked_at
+       FROM v_server_latest_status v
+       LEFT JOIN servers s ON s.id = v.server_id
+       ORDER BY v.location_name, v.hostname`
+    )
+    return (rows ?? []) as ServerLatestStatusRow[]
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT server_id, hostname, ip_address, location_name, overall_status,
+                mem_used_pct, cpu_load_pct, email_pop3, email_imap, web_service, checked_at
+         FROM v_server_latest_status
+         ORDER BY location_name, hostname`
+      )
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as ServerLatestStatusRow[]
+    }
+    throw err
+  }
 }
 
 export async function getWeeklyCompletion(): Promise<
@@ -134,17 +148,35 @@ export type ServerRow = {
 }
 
 export async function getServersList(): Promise<ServerRow[]> {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
-            l.name AS location_name,
-            COUNT(sc.id) AS component_count
-     FROM servers s
-     JOIN locations l ON s.location_id = l.id
-     LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
-     GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
-     ORDER BY l.name, s.sort_order`
-  )
-  return (rows ?? []) as ServerRow[]
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
+              l.name AS location_name,
+              COUNT(sc.id) AS component_count
+       FROM servers s
+       JOIN locations l ON s.location_id = l.id
+       LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
+       GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
+       ORDER BY l.name, s.sort_order`
+    )
+    return (rows ?? []) as ServerRow[]
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status,
+                l.name AS location_name,
+                COUNT(sc.id) AS component_count
+         FROM servers s
+         JOIN locations l ON s.location_id = l.id
+         LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
+         GROUP BY s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order
+         ORDER BY l.name, s.sort_order`
+      )
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as ServerRow[]
+    }
+    throw err
+  }
 }
 
 export type ServerNextCheckRow = {
@@ -155,31 +187,63 @@ export type ServerNextCheckRow = {
 export type ServerRowWithNextCheck = ServerRow & ServerNextCheckRow
 
 export async function getServersListWithNextCheck(): Promise<ServerRowWithNextCheck[]> {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
-            l.name AS location_name,
-            COUNT(sc.id) AS component_count,
-            ns.next_schedule_id,
-            ns.next_due_date
-     FROM servers s
-     JOIN locations l ON s.location_id = l.id
-     LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
-     LEFT JOIN (
-        SELECT ms.location_id,
-               MIN(ms.due_date) AS next_due_date,
-               SUBSTRING_INDEX(
-                 GROUP_CONCAT(ms.id ORDER BY ms.due_date ASC, ms.id ASC),
-                 ',', 1
-               ) AS next_schedule_id
-        FROM monitoring_schedules ms
-        WHERE ms.due_date >= CURDATE()
-          AND ms.status <> 'completed'
-        GROUP BY ms.location_id
-     ) ns ON ns.location_id = s.location_id
-     GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
-     ORDER BY l.name, s.sort_order`
-  )
-  return (rows ?? []) as ServerRowWithNextCheck[]
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status,
+              l.name AS location_name,
+              COUNT(sc.id) AS component_count,
+              ns.next_schedule_id,
+              ns.next_due_date
+       FROM servers s
+       JOIN locations l ON s.location_id = l.id
+       LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
+       LEFT JOIN (
+          SELECT ms.location_id,
+                 MIN(ms.due_date) AS next_due_date,
+                 SUBSTRING_INDEX(
+                   GROUP_CONCAT(ms.id ORDER BY ms.due_date ASC, ms.id ASC),
+                   ',', 1
+                 ) AS next_schedule_id
+          FROM monitoring_schedules ms
+          WHERE ms.due_date >= CURDATE()
+            AND ms.status <> 'completed'
+          GROUP BY ms.location_id
+       ) ns ON ns.location_id = s.location_id
+       GROUP BY s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
+       ORDER BY l.name, s.sort_order`
+    )
+    return (rows ?? []) as ServerRowWithNextCheck[]
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status,
+                l.name AS location_name,
+                COUNT(sc.id) AS component_count,
+                ns.next_schedule_id,
+                ns.next_due_date
+         FROM servers s
+         JOIN locations l ON s.location_id = l.id
+         LEFT JOIN server_components sc ON sc.server_id = s.id AND sc.is_active = 1
+         LEFT JOIN (
+            SELECT ms.location_id,
+                   MIN(ms.due_date) AS next_due_date,
+                   SUBSTRING_INDEX(
+                     GROUP_CONCAT(ms.id ORDER BY ms.due_date ASC, ms.id ASC),
+                     ',', 1
+                   ) AS next_schedule_id
+            FROM monitoring_schedules ms
+            WHERE ms.due_date >= CURDATE()
+              AND ms.status <> 'completed'
+            GROUP BY ms.location_id
+         ) ns ON ns.location_id = s.location_id
+         GROUP BY s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, l.name, s.sort_order, ns.next_due_date, ns.next_schedule_id
+         ORDER BY l.name, s.sort_order`
+      )
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as ServerRowWithNextCheck[]
+    }
+    throw err
+  }
 }
 
 export type ServerWithComponentsRow = ServerRow & {
@@ -270,21 +334,42 @@ export async function createServer(data: {
   location_id: number
   sort_order: number
 }): Promise<number> {
-  const [result] = await pool.execute<ResultSetHeader>(
-    `INSERT INTO servers (hostname, name, ip_address, os, server_type, physical_status, location_id, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.hostname,
-      data.name ?? null,
-      data.ip_address ?? null,
-      data.os ?? null,
-      data.server_type,
-      data.physical_status,
-      data.location_id,
-      data.sort_order,
-    ]
-  )
-  return result.insertId
+  try {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO servers (hostname, name, ip_address, os, server_type, physical_status, location_id, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.hostname,
+        data.name ?? null,
+        data.ip_address ?? null,
+        data.os ?? null,
+        data.server_type,
+        data.physical_status,
+        data.location_id,
+        data.sort_order,
+      ]
+    )
+    return result.insertId
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [result] = await pool.execute<ResultSetHeader>(
+        `INSERT INTO servers (hostname, ip_address, os, server_type, physical_status, location_id, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          data.hostname,
+          data.ip_address ?? null,
+          data.os ?? null,
+          data.server_type,
+          data.physical_status,
+          data.location_id,
+          data.sort_order,
+        ]
+      )
+      return result.insertId
+    }
+    throw err
+  }
 }
 
 export async function deactivateServer(id: number): Promise<void> {
@@ -310,15 +395,31 @@ export type ServerDetailRow = {
 }
 
 export async function getServerById(id: number): Promise<ServerDetailRow | null> {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, s.location_id, s.sort_order, l.name AS location_name
-     FROM servers s
-     JOIN locations l ON s.location_id = l.id
-     WHERE s.id = ? LIMIT 1`,
-    [id]
-  )
-  const r = (rows ?? [])[0]
-  return r ? (r as ServerDetailRow) : null
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT s.id, s.hostname, s.name, s.ip_address, s.os, s.server_type, s.physical_status, s.location_id, s.sort_order, l.name AS location_name
+       FROM servers s
+       JOIN locations l ON s.location_id = l.id
+       WHERE s.id = ? LIMIT 1`,
+      [id]
+    )
+    const r = (rows ?? [])[0]
+    return r ? (r as ServerDetailRow) : null
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT s.id, s.hostname, s.ip_address, s.os, s.server_type, s.physical_status, s.location_id, s.sort_order, l.name AS location_name
+         FROM servers s
+         JOIN locations l ON s.location_id = l.id
+         WHERE s.id = ? LIMIT 1`,
+        [id]
+      )
+      const r = (rows ?? [])[0]
+      return r ? { ...r, name: null } as ServerDetailRow : null
+    }
+    throw err
+  }
 }
 
 export async function updateServer(
@@ -370,7 +471,24 @@ export async function updateServer(
   }
   if (updates.length === 0) return
   params.push(id)
-  await pool.execute(`UPDATE servers SET ${updates.join(", ")} WHERE id = ?`, params)
+  try {
+    await pool.execute(`UPDATE servers SET ${updates.join(", ")} WHERE id = ?`, params)
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const nameIdx = updates.indexOf("name = ?")
+      if (nameIdx >= 0) {
+        const u2 = updates.filter((_, i) => i !== nameIdx)
+        const p2 = params.filter((_, i) => i !== nameIdx)
+        if (p2[p2.length - 1] !== id) p2[p2.length - 1] = id
+        await pool.execute(`UPDATE servers SET ${u2.join(", ")} WHERE id = ?`, p2)
+      } else {
+        throw err
+      }
+    } else {
+      throw err
+    }
+  }
 }
 
 export type ServerComponentDetailRow = ServerComponentRow & { component_type_id: number }
@@ -870,14 +988,35 @@ export async function getServerComponents(
 
 // ─── Servers by location (for a schedule) ──────────────────────────────────
 export async function getServersByLocation(locationId: number) {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.id, s.hostname, s.name, s.ip_address, s.sort_order
-     FROM servers s
-     WHERE s.location_id = ? AND s.physical_status = 'active'
-     ORDER BY s.sort_order`,
-    [locationId]
-  )
-  return (rows ?? []) as { id: number; hostname: string; name: string | null; ip_address: string | null; sort_order: number }[]
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT s.id, s.hostname, s.name, s.ip_address, s.sort_order
+       FROM servers s
+       WHERE s.location_id = ? AND s.physical_status = 'active'
+       ORDER BY s.sort_order`,
+      [locationId]
+    )
+    return (rows ?? []) as { id: number; hostname: string; name: string | null; ip_address: string | null; sort_order: number }[]
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT s.id, s.hostname, s.ip_address, s.sort_order
+         FROM servers s
+         WHERE s.location_id = ? AND s.physical_status = 'active'
+         ORDER BY s.sort_order`,
+        [locationId]
+      )
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as {
+        id: number
+        hostname: string
+        name: string | null
+        ip_address: string | null
+        sort_order: number
+      }[]
+    }
+    throw err
+  }
 }
 
 // ─── Save snapshot ──────────────────────────────────────────────────────────
@@ -1081,20 +1220,43 @@ export type ExportRow = {
 export async function getSessionExportData(
   sessionId: number
 ): Promise<ExportRow[]> {
-  const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT s.hostname, s.name, s.ip_address,
-            ss.mem_used_pct, ss.cpu_load_pct, ss.email_pop3, ss.email_imap,
-            ss.web_service, ss.av_pattern, ss.overall_status, ss.remark,
-            ct.name AS component_type, sc.label AS component_label,
-            sc.slot_index, ct.sort_order AS type_order, JSON_UNQUOTE(JSON_EXTRACT(cr.metrics, '$')) AS metrics
-     FROM server_snapshots ss
-     JOIN servers s ON ss.server_id = s.id
-     JOIN component_readings cr ON cr.snapshot_id = ss.id
-     JOIN server_components sc ON cr.server_component_id = sc.id
-     JOIN component_types ct ON sc.component_type_id = ct.id
-     WHERE ss.session_id = ?
-     ORDER BY s.sort_order, ct.sort_order, sc.slot_index`,
-    [sessionId]
-  )
-  return (rows ?? []) as ExportRow[]
+  try {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT s.hostname, s.name, s.ip_address,
+              ss.mem_used_pct, ss.cpu_load_pct, ss.email_pop3, ss.email_imap,
+              ss.web_service, ss.av_pattern, ss.overall_status, ss.remark,
+              ct.name AS component_type, sc.label AS component_label,
+              sc.slot_index, ct.sort_order AS type_order, JSON_UNQUOTE(JSON_EXTRACT(cr.metrics, '$')) AS metrics
+       FROM server_snapshots ss
+       JOIN servers s ON ss.server_id = s.id
+       JOIN component_readings cr ON cr.snapshot_id = ss.id
+       JOIN server_components sc ON cr.server_component_id = sc.id
+       JOIN component_types ct ON sc.component_type_id = ct.id
+       WHERE ss.session_id = ?
+       ORDER BY s.sort_order, ct.sort_order, sc.slot_index`,
+      [sessionId]
+    )
+    return (rows ?? []) as ExportRow[]
+  } catch (err: unknown) {
+    const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : ""
+    if (msg.includes("Unknown column") && msg.includes("name")) {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT s.hostname, s.ip_address,
+                ss.mem_used_pct, ss.cpu_load_pct, ss.email_pop3, ss.email_imap,
+                ss.web_service, ss.av_pattern, ss.overall_status, ss.remark,
+                ct.name AS component_type, sc.label AS component_label,
+                sc.slot_index, ct.sort_order AS type_order, JSON_UNQUOTE(JSON_EXTRACT(cr.metrics, '$')) AS metrics
+         FROM server_snapshots ss
+         JOIN servers s ON ss.server_id = s.id
+         JOIN component_readings cr ON cr.snapshot_id = ss.id
+         JOIN server_components sc ON cr.server_component_id = sc.id
+         JOIN component_types ct ON sc.component_type_id = ct.id
+         WHERE ss.session_id = ?
+         ORDER BY s.sort_order, ct.sort_order, sc.slot_index`,
+        [sessionId]
+      )
+      return ((rows ?? []) as RowDataPacket[]).map((r) => ({ ...r, name: null })) as ExportRow[]
+    }
+    throw err
+  }
 }

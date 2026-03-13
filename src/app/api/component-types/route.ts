@@ -7,7 +7,6 @@ export async function GET() {
   try {
     const session = await getSession()
     if (!session) return jsonError("Unauthorized", 401)
-    if (session.role !== "admin") return jsonError("Forbidden", 403)
     const list = await getComponentTypesList()
     return jsonOk(list)
   } catch (e) {
