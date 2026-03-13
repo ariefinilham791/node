@@ -16,7 +16,6 @@ import {
   Cell,
 } from "recharts"
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 
 type KPIs = {
   totalServers: number

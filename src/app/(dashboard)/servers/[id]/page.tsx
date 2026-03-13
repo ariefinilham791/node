@@ -77,19 +77,6 @@ function serverStatusVariant(status: string) {
   return status === "active" ? ("success" as const) : ("neutral" as const)
 }
 
-function snapshotStatusVariant(status: string | null) {
-  switch ((status ?? "").toUpperCase()) {
-    case "OK":
-      return "success" as const
-    case "WARNING":
-      return "warning" as const
-    case "CRITICAL":
-      return "error" as const
-    default:
-      return "neutral" as const
-  }
-}
-
 export default function ServerDetailPage() {
   const params = useParams()
   const serverId = Number(params.id)
@@ -358,7 +345,7 @@ export default function ServerDetailPage() {
     )
   }
 
-  const { server, components, latestSnapshot, componentReadings } = data
+  const { server, components } = data
 
   return (
     <main>

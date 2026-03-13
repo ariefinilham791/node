@@ -7,7 +7,7 @@ import { Label } from "@/components/Label"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { RiArrowDownSLine, RiArrowRightSLine, RiCheckboxCircleFill, RiEdit2Line, RiRefreshLine } from "@remixicon/react"
+import { RiCheckboxCircleFill, RiRefreshLine } from "@remixicon/react"
 import type { MetricField } from "@/types"
 import { toast } from "@/lib/toast"
 import { SkeletonBlock } from "@/components/ui/Loading"
@@ -186,7 +186,6 @@ export default function MonitoringFormPage() {
   const [loadingServers, setLoadingServers] = useState(true)
   const [loadingDraft, setLoadingDraft] = useState(false)
   const [viewMode, setViewMode] = useState<"form" | "list">("form")
-  const [expandedServerId, setExpandedServerId] = useState<number | null>(null)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [temperature, setTemperature] = useState("")
@@ -825,6 +824,7 @@ export default function MonitoringFormPage() {
           {saving ? "Memproses..." : "Submit final"}
         </Button>
       </div>
+      <ConfirmDialog open={resetConfirmOpen} title="Reset data monitoring?" description="Semua data yang sudah diisi (per server) akan dihapus dan form dikosongkan. Anda bisa mengisi ulang dari form." confirmText="Ya, kosongkan" cancelText="Batal" variant="destructive" loading={resetting} onConfirm={handleResetData} onCancel={() => setResetConfirmOpen(false)} />
         </>
       )}
     </main>
